@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import { useAuth } from "./AuthContext.jsx";
-import { adminApi } from "../../lib/api.js";
+import { adminApi } from "../lib/api.js";
 
 const HotelPortalContext = createContext({
   myHotel: null,
