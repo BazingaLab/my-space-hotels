@@ -7,7 +7,7 @@ import { useAdmin } from "../context/AdminContext.jsx";
 
 export default function Navbar() {
   const { user, signOut } = useAuth();
-  const { isAdmin, isHotelAdmin } = useAdmin();
+  const { isAdmin, isHotelAdmin, loading: roleLoading } = useAdmin();
   const navigate = useNavigate();
   const [dropdownOpen, setDropdownOpen] = useState(false);
 
@@ -49,7 +49,7 @@ export default function Navbar() {
 
         {/* List Property — visible to logged-out users and hotel admins only
             Regular logged-in users (guests) should not see this */}
-        {(!user || isHotelAdmin) && (
+        {(!user || (!roleLoading && isHotelAdmin)) && (
           <Link to="/list-property" className="link-underline" style={{ color: theme.SEA_DARK, textDecoration: "none", fontWeight: 500 }}>
             List Property
           </Link>
@@ -93,7 +93,7 @@ export default function Navbar() {
                   <div style={{ fontSize: 13, fontWeight: 600 }}>{user?.user_metadata?.full_name || "Guest"}</div>
                   <div style={{ fontSize: 12, color: theme.MUTED, marginTop: 2 }}>{user?.email}</div>
                   {/* Show role badge for admins */}
-                  {isHotelAdmin && (
+                  {!roleLoading && isHotelAdmin && (
                     <div style={{ fontSize: 10, color: theme.SEA, marginTop: 4, letterSpacing: "0.1em", textTransform: "uppercase" }}>
                       {isAdmin ? "Super Admin" : "Hotel Admin"}
                     </div>
@@ -108,7 +108,7 @@ export default function Navbar() {
 
                 {/* List Your Property — only visible to hotel admins
                     Regular guests should not see this option */}
-                {isHotelAdmin && (
+                {!roleLoading && isHotelAdmin && (
                   <Link to="/list-property" onClick={() => setDropdownOpen(false)}
                     style={{ display: "flex", alignItems: "center", gap: 10, padding: "14px 20px", textDecoration: "none", color: theme.INK, fontSize: 13, borderBottom: `1px solid ${theme.SAND}` }}>
                     <Building2 size={14} /> List Your Property
@@ -117,7 +117,7 @@ export default function Navbar() {
 
                 {/* Hotel Dashboard — only for hotel admins (not super admin)
                     Redirects to the hotel partner portal */}
-                {isHotelAdmin && !isAdmin && (
+                {!roleLoading && isHotelAdmin && !isAdmin && (
                   <Link to="/hotel-portal" onClick={() => setDropdownOpen(false)}
                     style={{ display: "flex", alignItems: "center", gap: 10, padding: "14px 20px", textDecoration: "none", color: theme.SEA_DARK, fontSize: 13, fontWeight: 600, borderBottom: `1px solid ${theme.SAND}` }}>
                     <LayoutDashboard size={14} /> Hotel Dashboard
@@ -126,7 +126,7 @@ export default function Navbar() {
 
                 {/* Super Admin Panel — only for super admins
                     Redirects to the full admin panel */}
-                {isAdmin && (
+                {!roleLoading && isAdmin && (
                   <Link to="/admin" onClick={() => setDropdownOpen(false)}
                     style={{ display: "flex", alignItems: "center", gap: 10, padding: "14px 20px", textDecoration: "none", color: theme.SEA_DARK, fontSize: 13, fontWeight: 600, borderBottom: `1px solid ${theme.SAND}` }}>
                     <LayoutDashboard size={14} /> Super Admin
