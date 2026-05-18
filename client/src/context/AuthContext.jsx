@@ -1,12 +1,5 @@
 import { createContext, useContext, useEffect, useState } from "react";
-import { createClient } from "@supabase/supabase-js";
-
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-
-const supabaseClient = (supabaseUrl && supabaseKey)
-  ? createClient(supabaseUrl, supabaseKey)
-  : null;
+import { supabase } from "../lib/supabase.js";
 
 const AuthContext = createContext({});
 
@@ -15,18 +8,20 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!supabaseClient) {
-      console.warn("Supabase env vars missing — auth disabled");
+    if (!supabase) {
+      console.warn("Supabase not initialized");
       setLoading(false);
       return;
     }
 
-    supabaseClient.auth.getSession().then(({ data: { session } }) => {
+    // Get current session
+    supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null);
       setLoading(false);
     });
 
-    const { data: { subscription } } = supabaseClient.auth.onAuthStateChange(
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (_event, session) => {
         setUser(session?.user ?? null);
       }
@@ -36,8 +31,8 @@ export function AuthProvider({ children }) {
   }, []);
 
   const signUp = async (email, password, fullName) => {
-    if (!supabaseClient) throw new Error("Auth not available");
-    const { data, error } = await supabaseClient.auth.signUp({
+    if (!supabase) throw new Error("Auth not available");
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: { data: { full_name: fullName } },
@@ -47,8 +42,8 @@ export function AuthProvider({ children }) {
   };
 
   const signIn = async (email, password) => {
-    if (!supabaseClient) throw new Error("Auth not available");
-    const { data, error } = await supabaseClient.auth.signInWithPassword({
+    if (!supabase) throw new Error("Auth not available");
+    const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
@@ -57,8 +52,8 @@ export function AuthProvider({ children }) {
   };
 
   const signInWithGoogle = async () => {
-    if (!supabaseClient) throw new Error("Auth not available");
-    const { error } = await supabaseClient.auth.signInWithOAuth({
+    if (!supabase) throw new Error("Auth not available");
+    const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: { redirectTo: `${window.location.origin}/` },
     });
@@ -66,15 +61,13 @@ export function AuthProvider({ children }) {
   };
 
   const signOut = async () => {
-    if (!supabaseClient) return;
-    const { error } = await supabaseClient.auth.signOut();
+    if (!supabase) return;
+    const { error } = await supabase.auth.signOut();
     if (error) throw error;
   };
 
   return (
-    <AuthContext.Provider
-      value={{ user, loading, signUp, signIn, signInWithGoogle, signOut }}
-    >
+    <AuthContext.Provider value={{ user, loading, signUp, signIn, signInWithGoogle, signOut }}>
       {children}
     </AuthContext.Provider>
   );

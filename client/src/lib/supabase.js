@@ -1,10 +1,21 @@
 import { createClient } from "@supabase/supabase-js";
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  console.error("❌ Missing Supabase credentials in client .env");
+// Create ONE single instance shared across the entire app
+// Multiple instances cause undefined auth behavior
+if (!supabaseUrl || !supabaseKey) {
+  console.warn("⚠️ Supabase env vars missing");
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+export const supabase = (supabaseUrl && supabaseKey)
+  ? createClient(supabaseUrl, supabaseKey, {
+      auth: {
+        autoRefreshToken: true,
+        persistSession: true,
+        detectSessionInUrl: true,
+        storageKey: "myspace-hotels-auth", // unique key prevents conflicts
+      },
+    })
+  : null;
