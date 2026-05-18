@@ -18,6 +18,7 @@ import AdminHotels from "./pages/admin/AdminHotels.jsx";
 import AdminBookings from "./pages/admin/AdminBookings.jsx";
 import AdminUsers from "./pages/admin/AdminUsers.jsx";
 import AdminPending from "./pages/admin/AdminPending.jsx";
+import HotelOwnerDashboard from "./pages/admin/HotelOwnerDashboard.jsx";
 
 function AdminRoutes() {
   return (
@@ -30,6 +31,7 @@ function AdminRoutes() {
           <Route path="/admin/bookings" element={<AdminBookings />} />
           <Route path="/admin/owners" element={<AdminUsers />} />
           <Route path="/admin/pending" element={<AdminPending />} />
+          <Route path="/admin/my-dashboard" element={<HotelOwnerDashboard />} />
         </Routes>
       </AdminProvider>
     </AuthProvider>

@@ -1,11 +1,13 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Sparkles, User, LogOut, ChevronDown } from "lucide-react";
+import { Sparkles, User, LogOut, ChevronDown, LayoutDashboard, Building2 } from "lucide-react";
 import { theme } from "../lib/theme.js";
 import { useAuth } from "../context/AuthContext.jsx";
+import { useAdmin } from "../context/AdminContext.jsx";
 
 export default function Navbar() {
   const { user, signOut } = useAuth();
+  const { isAdmin, isHotelAdmin } = useAdmin();
   const navigate = useNavigate();
   const [dropdownOpen, setDropdownOpen] = useState(false);
 
@@ -40,12 +42,15 @@ export default function Navbar() {
         <Link to="/hotels" className="link-underline" style={{ color: theme.INK, textDecoration: "none" }}>Destinations</Link>
         <a href="#" className="link-underline" style={{ color: theme.INK, textDecoration: "none" }}>Experiences</a>
         <a href="#" className="link-underline" style={{ color: theme.INK, textDecoration: "none" }}>Journal</a>
+        {/* Always show List Property */}
+        <Link to="/list-property" className="link-underline" style={{ color: theme.SEA_DARK, textDecoration: "none", fontWeight: 500 }}>
+          List Property
+        </Link>
       </div>
 
       {/* Auth section */}
       <div style={{ display: "flex", gap: 16, alignItems: "center" }}>
         {user ? (
-          // Logged in — show user dropdown
           <div style={{ position: "relative" }}>
             <button
               onClick={() => setDropdownOpen(!dropdownOpen)}
@@ -63,44 +68,59 @@ export default function Navbar() {
               <ChevronDown size={14} style={{ transform: dropdownOpen ? "rotate(180deg)" : "rotate(0)", transition: "transform 0.3s" }} />
             </button>
 
-            {/* Dropdown */}
             {dropdownOpen && (
               <div style={{
                 position: "absolute", right: 0, top: "calc(100% + 8px)",
                 background: "#fff", border: `1px solid ${theme.SAND}`,
-                boxShadow: "0 12px 40px rgba(0,0,0,0.1)", minWidth: 200, zIndex: 200,
+                boxShadow: "0 12px 40px rgba(0,0,0,0.1)", minWidth: 220, zIndex: 200,
               }}>
                 <div style={{ padding: "16px 20px", borderBottom: `1px solid ${theme.SAND}` }}>
                   <div style={{ fontSize: 13, fontWeight: 600 }}>{user?.user_metadata?.full_name || "Guest"}</div>
                   <div style={{ fontSize: 12, color: theme.MUTED, marginTop: 2 }}>{user?.email}</div>
+                  {isHotelAdmin && (
+                    <div style={{ fontSize: 10, color: theme.SEA, marginTop: 4, letterSpacing: "0.1em", textTransform: "uppercase" }}>
+                      {isAdmin ? "Super Admin" : "Hotel Admin"}
+                    </div>
+                  )}
                 </div>
-                <Link
-                  to="/my-bookings"
-                  onClick={() => setDropdownOpen(false)}
-                  style={{ display: "flex", alignItems: "center", gap: 10, padding: "14px 20px", textDecoration: "none", color: theme.INK, fontSize: 13, borderBottom: `1px solid ${theme.SAND}` }}
-                >
+
+                {/* My Bookings — for regular users */}
+                <Link to="/my-bookings" onClick={() => setDropdownOpen(false)}
+                  style={{ display: "flex", alignItems: "center", gap: 10, padding: "14px 20px", textDecoration: "none", color: theme.INK, fontSize: 13, borderBottom: `1px solid ${theme.SAND}` }}>
                   My Bookings
                 </Link>
-                <button
-                  onClick={handleSignOut}
-                  style={{
-                    display: "flex", alignItems: "center", gap: 10,
-                    padding: "14px 20px", background: "transparent", border: "none",
-                    width: "100%", textAlign: "left", cursor: "pointer",
-                    fontSize: 13, color: "#a33", fontFamily: "Inter, sans-serif",
-                  }}
-                >
+
+                {/* List Property — always visible */}
+                <Link to="/list-property" onClick={() => setDropdownOpen(false)}
+                  style={{ display: "flex", alignItems: "center", gap: 10, padding: "14px 20px", textDecoration: "none", color: theme.INK, fontSize: 13, borderBottom: `1px solid ${theme.SAND}` }}>
+                  <Building2 size={14} /> List Your Property
+                </Link>
+
+                {/* Hotel Admin Dashboard — only for hotel admins */}
+                {isHotelAdmin && (
+                  <Link to="/admin/my-dashboard" onClick={() => setDropdownOpen(false)}
+                    style={{ display: "flex", alignItems: "center", gap: 10, padding: "14px 20px", textDecoration: "none", color: theme.SEA_DARK, fontSize: 13, fontWeight: 600, borderBottom: `1px solid ${theme.SAND}` }}>
+                    <LayoutDashboard size={14} /> Hotel Dashboard
+                  </Link>
+                )}
+
+                {/* Super Admin — only for super admins */}
+                {isAdmin && (
+                  <Link to="/admin" onClick={() => setDropdownOpen(false)}
+                    style={{ display: "flex", alignItems: "center", gap: 10, padding: "14px 20px", textDecoration: "none", color: theme.SEA_DARK, fontSize: 13, fontWeight: 600, borderBottom: `1px solid ${theme.SAND}` }}>
+                    <LayoutDashboard size={14} /> Super Admin
+                  </Link>
+                )}
+
+                <button onClick={handleSignOut}
+                  style={{ display: "flex", alignItems: "center", gap: 10, padding: "14px 20px", background: "transparent", border: "none", width: "100%", textAlign: "left", cursor: "pointer", fontSize: 13, color: "#a33", fontFamily: "Inter, sans-serif" }}>
                   <LogOut size={14} /> Sign Out
                 </button>
               </div>
             )}
           </div>
         ) : (
-          // Not logged in — show sign in + book
           <>
-            <Link to="/list-property" className="hide-mobile link-underline" style={{ fontSize: 13, color: theme.SEA_DARK, textDecoration: "none", fontWeight: 500 }}>
-              List your property
-            </Link>
             <Link to="/login" className="hide-mobile link-underline" style={{ fontSize: 13, color: theme.INK, textDecoration: "none" }}>
               Sign in
             </Link>
