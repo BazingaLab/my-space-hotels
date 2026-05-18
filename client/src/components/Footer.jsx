@@ -3,7 +3,7 @@ import { theme } from "../lib/theme.js";
 
 export default function Footer() {
   const cols = [
-    { title: "Discover", links: ["All Stays", "Destinations", "Experiences", "Gift Cards"] },
+    { title: "Discover", links: ["All Stays", "Destinations", "Experiences", "Gift Cards", "List Your Property"] },
     { title: "Company", links: ["Our Story", "Press", "Careers", "Sustainability"] },
     { title: "Support", links: ["Help Centre", "Contact", "Cancellations", "Trust & Safety"] },
   ];

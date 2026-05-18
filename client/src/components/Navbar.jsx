@@ -98,6 +98,9 @@ export default function Navbar() {
         ) : (
           // Not logged in — show sign in + book
           <>
+            <Link to="/list-property" className="hide-mobile link-underline" style={{ fontSize: 13, color: theme.SEA_DARK, textDecoration: "none", fontWeight: 500 }}>
+              List your property
+            </Link>
             <Link to="/login" className="hide-mobile link-underline" style={{ fontSize: 13, color: theme.INK, textDecoration: "none" }}>
               Sign in
             </Link>
