@@ -17,14 +17,39 @@ export default function HotelPortalLayout({ children }) {
   const location = useLocation();
   const navigate = useNavigate();
 
+  // Show loading screen while checking role
   if (loading) return (
     <div style={{ minHeight: "100vh", display: "grid", placeItems: "center", background: "#F5F5F0" }}>
       <div className="serif" style={{ fontSize: 28, color: theme.MUTED }}>Loading…</div>
     </div>
   );
 
+  // Not logged in → redirect to hotel portal login
   if (!user) return <Navigate to="/hotel-portal/login" replace />;
-  if (!isHotelier) return <Navigate to="/hotel-portal/login" replace />;
+
+  // Logged in but NOT a hotel admin → show access denied, not a blank page
+  if (!isHotelier) return (
+    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#F5F5F0", padding: 40 }}>
+      <div style={{ textAlign: "center", maxWidth: 480, background: "#fff", padding: 48, border: `1px solid ${theme.SAND}` }}>
+        <div style={{ fontSize: 48, marginBottom: 20 }}>🔒</div>
+        <h2 className="serif" style={{ fontSize: 36, fontWeight: 400, marginBottom: 16 }}>Access Denied</h2>
+        <p style={{ color: theme.MUTED, marginBottom: 12, lineHeight: 1.7 }}>
+          This portal is for approved hotel partners only. Regular guest accounts cannot access this area.
+        </p>
+        <p style={{ color: theme.MUTED, marginBottom: 32, fontSize: 13, lineHeight: 1.7 }}>
+          If you'd like to list your property, submit an application and our team will review it within 48 hours.
+        </p>
+        <div style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap" }}>
+          <Link to="/list-property" style={{ background: theme.SEA, color: theme.CREAM, padding: "14px 24px", textDecoration: "none", fontSize: 13, letterSpacing: "0.15em", textTransform: "uppercase" }}>
+            Apply as Partner
+          </Link>
+          <Link to="/" style={{ background: "transparent", border: `1px solid ${theme.INK}`, color: theme.INK, padding: "14px 24px", textDecoration: "none", fontSize: 13, letterSpacing: "0.15em", textTransform: "uppercase" }}>
+            Back to Site
+          </Link>
+        </div>
+      </div>
+    </div>
+  );
 
   const handleSignOut = async () => {
     await signOut();
@@ -84,7 +109,6 @@ export default function HotelPortalLayout({ children }) {
             );
           })}
 
-          {/* View live listing */}
           {myHotel && (
             <a href={`/hotels/${myHotel.id}`} target="_blank" rel="noreferrer" style={{
               display: "flex", alignItems: "center", gap: 12,
@@ -112,7 +136,7 @@ export default function HotelPortalLayout({ children }) {
         </div>
       </aside>
 
-      {/* Main */}
+      {/* Main content */}
       <main style={{ marginLeft: 260, flex: 1, padding: "40px 40px" }}>
         {children}
       </main>
