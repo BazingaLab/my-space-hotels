@@ -36,3 +36,11 @@ export const adminApi = {
   getOwnerBookings: (ownerId) => request(`/api/admin/bookings/owner/${ownerId}`),
   getAnalytics: () => request("/api/admin/analytics"),
 };
+
+export const pendingApi = {
+  submit: (data) => request("/api/pending", { method: "POST", body: JSON.stringify(data) }),
+  getAll: (status) => request(`/api/pending${status ? `?status=${status}` : ""}`),
+  getMine: (ownerId) => request(`/api/pending/mine/${ownerId}`),
+  approve: (id) => request(`/api/pending/${id}/approve`, { method: "POST" }),
+  reject: (id, reason) => request(`/api/pending/${id}/reject`, { method: "POST", body: JSON.stringify({ reason }) }),
+};

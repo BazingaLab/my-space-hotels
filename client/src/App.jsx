@@ -11,13 +11,14 @@ import Booking from "./pages/Booking.jsx";
 import Login from "./pages/Login.jsx";
 import Signup from "./pages/Signup.jsx";
 import MyBookings from "./pages/MyBookings.jsx";
+import ListProperty from "./pages/ListProperty.jsx";
 import AdminLogin from "./pages/admin/AdminLogin.jsx";
 import AdminDashboard from "./pages/admin/AdminDashboard.jsx";
 import AdminHotels from "./pages/admin/AdminHotels.jsx";
 import AdminBookings from "./pages/admin/AdminBookings.jsx";
 import AdminUsers from "./pages/admin/AdminUsers.jsx";
+import AdminPending from "./pages/admin/AdminPending.jsx";
 
-// Admin pages don't use the main Navbar/Footer
 function AdminRoutes() {
   return (
     <AuthProvider>
@@ -28,6 +29,7 @@ function AdminRoutes() {
           <Route path="/admin/hotels" element={<AdminHotels />} />
           <Route path="/admin/bookings" element={<AdminBookings />} />
           <Route path="/admin/owners" element={<AdminUsers />} />
+          <Route path="/admin/pending" element={<AdminPending />} />
         </Routes>
       </AdminProvider>
     </AuthProvider>
@@ -45,6 +47,7 @@ function PublicRoutes() {
           <Route path="/hotels/:id" element={<HotelDetail />} />
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
+          <Route path="/list-property" element={<ListProperty />} />
           <Route path="/book/:id" element={<ProtectedRoute><Booking /></ProtectedRoute>} />
           <Route path="/my-bookings" element={<ProtectedRoute><MyBookings /></ProtectedRoute>} />
         </Routes>

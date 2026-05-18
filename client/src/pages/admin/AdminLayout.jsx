@@ -9,6 +9,7 @@ const navItems = [
   { path: "/admin/hotels", label: "Hotels", icon: Hotel, adminOnly: false },
   { path: "/admin/bookings", label: "Bookings", icon: CalendarCheck, adminOnly: false },
   { path: "/admin/owners", label: "Owners", icon: Users, adminOnly: true },
+  { path: "/admin/pending", label: "Pending", icon: Hotel, adminOnly: true },
   { path: "/admin/analytics", label: "Analytics", icon: BarChart3, adminOnly: true },
 ];
 
