@@ -98,7 +98,7 @@ export default function Navbar() {
 
                 {/* Hotel Admin Dashboard — only for hotel admins */}
                 {isHotelAdmin && (
-                  <Link to="/admin/my-dashboard" onClick={() => setDropdownOpen(false)}
+                  <Link to="/hotel-portal" onClick={() => setDropdownOpen(false)}
                     style={{ display: "flex", alignItems: "center", gap: 10, padding: "14px 20px", textDecoration: "none", color: theme.SEA_DARK, fontSize: 13, fontWeight: 600, borderBottom: `1px solid ${theme.SAND}` }}>
                     <LayoutDashboard size={14} /> Hotel Dashboard
                   </Link>

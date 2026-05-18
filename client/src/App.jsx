@@ -1,6 +1,7 @@
 import { Routes, Route } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext.jsx";
 import { AdminProvider } from "./context/AdminContext.jsx";
+import { HotelPortalProvider } from "./context/HotelPortalContext.jsx";
 import Navbar from "./components/Navbar.jsx";
 import Footer from "./components/Footer.jsx";
 import ProtectedRoute from "./components/ProtectedRoute.jsx";
@@ -12,13 +13,21 @@ import Login from "./pages/Login.jsx";
 import Signup from "./pages/Signup.jsx";
 import MyBookings from "./pages/MyBookings.jsx";
 import ListProperty from "./pages/ListProperty.jsx";
+
+// Admin pages
 import AdminLogin from "./pages/admin/AdminLogin.jsx";
 import AdminDashboard from "./pages/admin/AdminDashboard.jsx";
 import AdminHotels from "./pages/admin/AdminHotels.jsx";
 import AdminBookings from "./pages/admin/AdminBookings.jsx";
 import AdminUsers from "./pages/admin/AdminUsers.jsx";
 import AdminPending from "./pages/admin/AdminPending.jsx";
-import HotelOwnerDashboard from "./pages/admin/HotelOwnerDashboard.jsx";
+
+// Hotel portal pages
+import HotelPortalLogin from "./pages/hotel-portal/HotelPortalLogin.jsx";
+import HotelPortalDashboard from "./pages/hotel-portal/HotelPortalDashboard.jsx";
+import PropertyManager from "./pages/hotel-portal/PropertyManager.jsx";
+import PhotoManager from "./pages/hotel-portal/PhotoManager.jsx";
+import BookingsManager from "./pages/hotel-portal/BookingsManager.jsx";
 
 function AdminRoutes() {
   return (
@@ -31,8 +40,25 @@ function AdminRoutes() {
           <Route path="/admin/bookings" element={<AdminBookings />} />
           <Route path="/admin/owners" element={<AdminUsers />} />
           <Route path="/admin/pending" element={<AdminPending />} />
-          <Route path="/admin/my-dashboard" element={<HotelOwnerDashboard />} />
         </Routes>
+      </AdminProvider>
+    </AuthProvider>
+  );
+}
+
+function HotelPortalRoutes() {
+  return (
+    <AuthProvider>
+      <AdminProvider>
+        <HotelPortalProvider>
+          <Routes>
+            <Route path="/hotel-portal/login" element={<HotelPortalLogin />} />
+            <Route path="/hotel-portal" element={<HotelPortalDashboard />} />
+            <Route path="/hotel-portal/property" element={<PropertyManager />} />
+            <Route path="/hotel-portal/photos" element={<PhotoManager />} />
+            <Route path="/hotel-portal/bookings" element={<BookingsManager />} />
+          </Routes>
+        </HotelPortalProvider>
       </AdminProvider>
     </AuthProvider>
   );
@@ -60,6 +86,8 @@ function PublicRoutes() {
 }
 
 export default function App() {
-  const isAdmin = window.location.pathname.startsWith("/admin");
-  return isAdmin ? <AdminRoutes /> : <PublicRoutes />;
+  const path = window.location.pathname;
+  if (path.startsWith("/admin")) return <AdminRoutes />;
+  if (path.startsWith("/hotel-portal")) return <HotelPortalRoutes />;
+  return <PublicRoutes />;
 }
