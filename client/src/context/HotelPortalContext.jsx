@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState } from "react";
-{ title: "Disimport { useAuth } from "./AuthContext.jsx";cover", links: ["All Stays", "Destinations", "Experiences", "Gift Cards", "List Your Property"] }
+import { useAuth } from "./AuthContext.jsx";
 import { adminApi } from "../../lib/api.js";
 
 const HotelPortalContext = createContext({
