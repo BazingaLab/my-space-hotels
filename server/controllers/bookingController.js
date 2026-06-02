@@ -4,7 +4,7 @@ import { syncCustomerFromBooking } from "./customerController.js";
 // POST /api/bookings
 export const createBooking = async (req, res) => {
   try {
-    const { hotel_id, guest_name, guest_email, guest_phone, check_in, check_out, guests } = req.body;
+    const { hotel_id, guest_name, guest_email, guest_phone, check_in, check_out, guests, user_id } = req.body;
 
     if (!hotel_id || !guest_name || !guest_email || !check_in || !check_out) {
       return res.status(400).json({ message: "Missing required fields" });
@@ -38,6 +38,7 @@ export const createBooking = async (req, res) => {
           nights,
           total_price,
           status: "confirmed",
+          user_id: user_id || null,
         },
       ])
       .select()
@@ -66,9 +67,25 @@ export const getBookingsByEmail = async (req, res) => {
     const { data, error } = await supabase
       .from("bookings")
       .select("*, hotels(name, city, cover_image)")
-      .eq("guest_email", req.params.email)
+      .ilike("guest_email", req.params.email)
       .order("created_at", { ascending: false });
 
+    if (error) throw error;
+    res.json({ count: data.length, bookings: data });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+
+// GET /api/bookings/user/:userId  — bookings owned by a logged-in account
+export const getBookingsByUser = async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from("bookings")
+      .select("*, hotels(name, city, cover_image)")
+      .eq("user_id", req.params.userId)
+      .order("created_at", { ascending: false });
     if (error) throw error;
     res.json({ count: data.length, bookings: data });
   } catch (error) {

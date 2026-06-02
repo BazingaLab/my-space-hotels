@@ -22,6 +22,7 @@ export const api = {
   getPopularDestinations: () => request("/api/hotels/destinations/popular"),
   createBooking: (data) => request("/api/bookings", { method: "POST", body: JSON.stringify(data) }),
   getBookings: (email) => request(`/api/bookings/${email}`),
+  getBookingsByUser: (userId) => request(`/api/bookings/user/${userId}`),
 };
 
 export const adminApi = {

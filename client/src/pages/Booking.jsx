@@ -3,9 +3,11 @@ import { useParams, Link } from "react-router-dom";
 import { Check, ArrowRight } from "lucide-react";
 import { theme } from "../lib/theme.js";
 import { api } from "../lib/api.js";
+import { useAuth } from "../context/AuthContext.jsx";
 
 export default function Booking() {
   const { id } = useParams();
+  const { user } = useAuth();
   const [hotel, setHotel] = useState(null);
   const [form, setForm] = useState({
     guest_name: "", guest_email: "", guest_phone: "",
@@ -19,6 +21,17 @@ export default function Booking() {
     api.getHotelById(id).then(setHotel).catch(err => setError(err.message));
   }, [id]);
 
+  // Prefill guest details from the logged-in account
+  useEffect(() => {
+    if (user) {
+      setForm(f => ({
+        ...f,
+        guest_email: f.guest_email || user.email || "",
+        guest_name: f.guest_name || user.user_metadata?.full_name || "",
+      }));
+    }
+  }, [user]);
+
   const nights = form.check_in && form.check_out
     ? Math.max(0, Math.ceil((new Date(form.check_out) - new Date(form.check_in)) / (1000 * 60 * 60 * 24)))
     : 0;
@@ -29,7 +42,7 @@ export default function Booking() {
     setError(null);
     setSubmitting(true);
     try {
-      const res = await api.createBooking({ hotel_id: id, ...form, guests: Number(form.guests) });
+      const res = await api.createBooking({ hotel_id: id, ...form, guests: Number(form.guests), user_id: user?.id || null });
       setConfirmed(res.booking);
     } catch (err) {
       setError(err.message);

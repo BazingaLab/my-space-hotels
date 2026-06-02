@@ -56,20 +56,20 @@ export default function MyBookings() {
   ========================= */
 
   useEffect(() => {
-    if (user?.email) {
-      api.getBookings(user.email)
-        .then((data) =>
-          setBookings(
-            data.bookings || []
-          )
-        )
-        .catch((err) =>
-          setError(err.message)
-        )
-        .finally(() =>
-          setLoading(false)
-        );
-    }
+    if (!user?.id) return;
+    // Primary: bookings owned by this account (user_id).
+    // Fallback: legacy/guest bookings matched by email.
+    api.getBookingsByUser(user.id)
+      .then(async (data) => {
+        let list = data.bookings || [];
+        if (list.length === 0 && user.email) {
+          const byEmail = await api.getBookings(user.email).catch(() => ({ bookings: [] }));
+          list = byEmail.bookings || [];
+        }
+        setBookings(list);
+      })
+      .catch((err) => setError(err.message))
+      .finally(() => setLoading(false));
   }, [user]);
 
   /* =========================
