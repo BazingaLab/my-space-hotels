@@ -1,5 +1,6 @@
 import { supabase } from "../config/supabase.js";
 import { syncCustomerFromBooking } from "./customerController.js";
+import { creditBookingToWallet } from "./walletController.js";
 
 // POST /api/bookings
 export const createBooking = async (req, res) => {
@@ -54,6 +55,10 @@ export const createBooking = async (req, res) => {
         data.customer_id = customer.id;
       }
     } catch (e) { console.error("Customer sync failed:", e.message); }
+
+    // Credit hotel wallet (net of commission)
+    try { await creditBookingToWallet(data); }
+    catch (e) { console.error("Wallet credit failed:", e.message); }
 
     res.status(201).json({ message: "Booking confirmed", booking: data });
   } catch (error) {

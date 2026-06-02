@@ -1,4 +1,5 @@
 import { supabase } from "../config/supabase.js";
+import { ensureWallet } from "./walletController.js";
 
 export const getUserRole = async (req, res) => {
   try {
@@ -69,6 +70,7 @@ export const adminCreateHotel = async (req, res) => {
     const hotel = { ...req.body, images: req.body.images || [], amenities: req.body.amenities || [] };
     const { data, error } = await supabase.from("hotels").insert([hotel]).select().single();
     if (error) throw error;
+    try { await ensureWallet(data.id); } catch (e) { console.error("Wallet create failed:", e.message); }
     res.status(201).json(data);
   } catch (error) {
     res.status(400).json({ message: error.message });

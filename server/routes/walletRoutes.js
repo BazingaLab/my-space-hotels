@@ -1,0 +1,8 @@
+import express from "express";
+import { listWallets, getHotelWallet, settle, summary } from "../controllers/walletController.js";
+const router = express.Router();
+router.get("/", listWallets);
+router.get("/summary", summary);
+router.get("/hotel/:hotelId", getHotelWallet);
+router.post("/settle", settle);
+export default router;

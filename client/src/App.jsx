@@ -41,6 +41,7 @@ import AdminComplaints from "./features/complaints/AdminComplaints.jsx";
 import AdminAddHotel from "./pages/admin/AdminAddHotel.jsx";
 import AdminCustomers from "./pages/admin/AdminCustomers.jsx";
 import AdminCustomerDetail from "./pages/admin/AdminCustomerDetail.jsx";
+import AdminWallets from "./pages/admin/AdminWallets.jsx";
 import AdminUsers from "./pages/admin/AdminUsers.jsx";
 import AdminPending from "./pages/admin/AdminPending.jsx";
 
@@ -190,6 +191,15 @@ function AppRoutes() {
           element={
             <ProtectedRoute requireAdmin>
               <AdminCustomerDetail />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/admin/wallets"
+          element={
+            <ProtectedRoute requireAdmin>
+              <AdminWallets />
             </ProtectedRoute>
           }
         />

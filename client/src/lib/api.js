@@ -66,3 +66,10 @@ export const customersApi = {
   update: (id, patch) => request(`/api/customers/${id}`, { method: "PATCH", body: JSON.stringify(patch) }),
   stats: () => request("/api/customers/stats/summary"),
 };
+
+export const walletsApi = {
+  list: () => request("/api/wallets"),
+  summary: () => request("/api/wallets/summary"),
+  getHotelWallet: (hotelId) => request(`/api/wallets/hotel/${hotelId}`),
+  settle: (data) => request("/api/wallets/settle", { method: "POST", body: JSON.stringify(data) }),
+};
