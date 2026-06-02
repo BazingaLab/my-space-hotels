@@ -55,3 +55,13 @@ export const complaintsApi = {
   update: (id, patch) => request(`/api/complaints/${id}`, { method: "PATCH", body: JSON.stringify(patch) }),
   resolve: (id, notes) => request(`/api/complaints/${id}/resolve`, { method: "POST", body: JSON.stringify({ resolution_notes: notes }) }),
 };
+
+export const customersApi = {
+  list: (filters = {}) => {
+    const qs = new URLSearchParams(Object.entries(filters).filter(([_, v]) => v)).toString();
+    return request(`/api/customers${qs ? `?${qs}` : ""}`);
+  },
+  get: (id) => request(`/api/customers/${id}`),
+  update: (id, patch) => request(`/api/customers/${id}`, { method: "PATCH", body: JSON.stringify(patch) }),
+  stats: () => request("/api/customers/stats/summary"),
+};

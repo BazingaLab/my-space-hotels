@@ -6,6 +6,7 @@ import bookingRoutes from "./routes/bookingRoutes.js";
 import adminRoutes from "./routes/adminRoutes.js";
 import pendingRoutes from "./routes/pendingRoutes.js";
 import complaintsRoutes from "./routes/complaintsRoutes.js";
+import customerRoutes from "./routes/customerRoutes.js";
 
 dotenv.config();
 
@@ -26,6 +27,7 @@ app.use("/api/bookings", bookingRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/pending", pendingRoutes);
 app.use("/api/complaints", complaintsRoutes);
+app.use("/api/customers", customerRoutes);
 
 app.use((req, res) => res.status(404).json({ message: "Route not found" }));
 app.use((err, req, res, next) => {

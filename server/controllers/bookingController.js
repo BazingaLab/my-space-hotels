@@ -1,4 +1,5 @@
 import { supabase } from "../config/supabase.js";
+import { syncCustomerFromBooking } from "./customerController.js";
 
 // POST /api/bookings
 export const createBooking = async (req, res) => {
@@ -43,6 +44,16 @@ export const createBooking = async (req, res) => {
       .single();
 
     if (error) throw error;
+
+    // Auto-create / update CRM customer record
+    try {
+      const customer = await syncCustomerFromBooking(data);
+      if (customer) {
+        await supabase.from("bookings").update({ customer_id: customer.id }).eq("id", data.id);
+        data.customer_id = customer.id;
+      }
+    } catch (e) { console.error("Customer sync failed:", e.message); }
+
     res.status(201).json({ message: "Booking confirmed", booking: data });
   } catch (error) {
     res.status(500).json({ message: error.message });
