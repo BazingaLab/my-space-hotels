@@ -78,16 +78,45 @@ export const getBookingsByEmail = async (req, res) => {
 };
 
 
-// GET /api/bookings/user/:userId  — bookings owned by a logged-in account
+// GET /api/bookings/user/:userId
+// Returns bookings by user_id OR by the account email — so bookings
+// always show regardless of what email the user typed at checkout.
 export const getBookingsByUser = async (req, res) => {
   try {
-    const { data, error } = await supabase
+    const { userId } = req.params;
+
+    // Step 1: get the account email (service role can access auth.admin)
+    const { data: { user }, error: authErr } = await supabase.auth.admin.getUserById(userId);
+    const userEmail = user?.email || null;
+
+    // Step 2: bookings linked by user_id
+    const { data: byId, error: e1 } = await supabase
       .from("bookings")
       .select("*, hotels(name, city, cover_image)")
-      .eq("user_id", req.params.userId)
+      .eq("user_id", userId)
       .order("created_at", { ascending: false });
-    if (error) throw error;
-    res.json({ count: data.length, bookings: data });
+    if (e1) throw e1;
+
+    // Step 3: bookings linked by account email (catches typed-different-email case)
+    let byEmail = [];
+    if (userEmail) {
+      const { data } = await supabase
+        .from("bookings")
+        .select("*, hotels(name, city, cover_image)")
+        .ilike("guest_email", userEmail)
+        .order("created_at", { ascending: false });
+      byEmail = data || [];
+    }
+
+    // Step 4: merge and deduplicate
+    const seen = new Set();
+    const combined = [...(byId || []), ...byEmail].filter(b => {
+      if (seen.has(b.id)) return false;
+      seen.add(b.id);
+      return true;
+    }).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+    res.json({ count: combined.length, bookings: combined });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
