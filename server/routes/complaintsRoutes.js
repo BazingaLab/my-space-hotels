@@ -1,0 +1,10 @@
+import express from "express";
+import { list, get, create, update, resolve, assign } from "../controllers/complaintsController.js";
+const router = express.Router();
+router.get("/", list);
+router.get("/:id", get);
+router.post("/", create);
+router.patch("/:id", update);
+router.post("/:id/resolve", resolve);
+router.post("/:id/assign", assign);
+export default router;
