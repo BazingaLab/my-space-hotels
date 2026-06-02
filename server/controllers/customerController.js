@@ -75,7 +75,7 @@ export const get = async (req, res) => {
     const { data: bookings } = await supabase
       .from("bookings")
       .select("*, hotels(name, city)")
-      .eq("guest_email", customer.email)
+      .ilike("guest_email", customer.email)
       .order("created_at", { ascending: false });
 
     res.json({ ...customer, bookings: bookings || [] });
