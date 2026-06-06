@@ -73,3 +73,14 @@ export const walletsApi = {
   getHotelWallet: (hotelId) => request(`/api/wallets/hotel/${hotelId}`),
   settle: (data) => request("/api/wallets/settle", { method: "POST", body: JSON.stringify(data) }),
 };
+
+export const bookingMgmtApi = {
+  list: (filters = {}) => {
+    const qs = new URLSearchParams(Object.entries(filters).filter(([_, v]) => v)).toString();
+    return request(`/api/booking-mgmt${qs ? `?${qs}` : ""}`);
+  },
+  stats: () => request("/api/booking-mgmt/stats"),
+  cancel: (id, data) => request(`/api/booking-mgmt/${id}/cancel`, { method: "POST", body: JSON.stringify(data) }),
+  transfer: (id, new_hotel_id) => request(`/api/booking-mgmt/${id}/transfer`, { method: "POST", body: JSON.stringify({ new_hotel_id }) }),
+  update: (id, patch) => request(`/api/booking-mgmt/${id}`, { method: "PATCH", body: JSON.stringify(patch) }),
+};

@@ -37,6 +37,7 @@ import AdminLogin from "./pages/admin/AdminLogin.jsx";
 import AdminDashboard from "./pages/admin/AdminDashboard.jsx";
 import AdminHotels from "./pages/admin/AdminHotels.jsx";
 import AdminBookings from "./pages/admin/AdminBookings.jsx";
+import AdminBookingLifecycle from "./pages/admin/AdminBookingLifecycle.jsx";
 import AdminComplaints from "./features/complaints/AdminComplaints.jsx";
 import AdminAddHotel from "./pages/admin/AdminAddHotel.jsx";
 import AdminCustomers from "./pages/admin/AdminCustomers.jsx";
@@ -218,7 +219,7 @@ function AppRoutes() {
           path="/admin/bookings"
           element={
             <ProtectedRoute requireAdmin>
-              <AdminBookings />
+              <AdminBookingLifecycle />
             </ProtectedRoute>
           }
         />
