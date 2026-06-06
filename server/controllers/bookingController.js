@@ -71,7 +71,7 @@ export const getBookingsByEmail = async (req, res) => {
   try {
     const { data, error } = await supabase
       .from("bookings")
-      .select("*, hotels(name, city, cover_image)")
+      .select("*, hotels!hotel_id(name, city, cover_image)")
       .ilike("guest_email", req.params.email)
       .order("created_at", { ascending: false });
 
@@ -97,7 +97,7 @@ export const getBookingsByUser = async (req, res) => {
     // Step 2: bookings linked by user_id
     const { data: byId, error: e1 } = await supabase
       .from("bookings")
-      .select("*, hotels(name, city, cover_image)")
+      .select("*, hotels!hotel_id(name, city, cover_image)")
       .eq("user_id", userId)
       .order("created_at", { ascending: false });
     if (e1) throw e1;
@@ -107,7 +107,7 @@ export const getBookingsByUser = async (req, res) => {
     if (userEmail) {
       const { data } = await supabase
         .from("bookings")
-        .select("*, hotels(name, city, cover_image)")
+        .select("*, hotels!hotel_id(name, city, cover_image)")
         .ilike("guest_email", userEmail)
         .order("created_at", { ascending: false });
       byEmail = data || [];

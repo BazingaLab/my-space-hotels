@@ -19,7 +19,7 @@ export const list = async (req, res) => {
   try {
     const { status, search } = req.query;
     let q = supabase.from("bookings")
-      .select("*, hotels(name, city)")
+      .select("*, hotels!hotel_id(name, city)")
       .order("created_at", { ascending: false });
     if (search) q = q.or(`guest_name.ilike.%${search}%,guest_email.ilike.%${search}%`);
     const { data, error } = await q;
