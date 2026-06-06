@@ -54,6 +54,7 @@ import HotelPortalDashboard from "./pages/hotel-portal/HotelPortalDashboard.jsx"
 import PropertyManager from "./pages/hotel-portal/PropertyManager.jsx";
 import PhotoManager from "./pages/hotel-portal/PhotoManager.jsx";
 import BookingsManager from "./pages/hotel-portal/BookingsManager.jsx";
+import WalletView from "./pages/hotel-portal/WalletView.jsx";
 
 /* =========================
    INNER ROUTES
@@ -169,6 +170,15 @@ function AppRoutes() {
         />
 
         <Route
+          path="/admin/analytics"
+          element={
+            <ProtectedRoute requireAdmin>
+              <AdminDashboard />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
           path="/admin/hotels"
           element={
             <ProtectedRoute requireAdmin>
@@ -274,6 +284,15 @@ function AppRoutes() {
           element={
             <ProtectedRoute requireHotelAdmin>
               <PhotoManager />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/hotel-portal/wallet"
+          element={
+            <ProtectedRoute requireHotelAdmin>
+              <WalletView />
             </ProtectedRoute>
           }
         />
