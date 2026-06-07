@@ -79,16 +79,67 @@ export const adminGetHotels = async (req, res) => {
   }
 };
 
+// Generate a readable temporary password for first-time owner login.
+function genTempPassword() {
+  const part = Math.random().toString(36).slice(-6);
+  return `MSH-${part}${Math.floor(10 + Math.random() * 89)}`;
+}
+
+// Provision (or find) a hotel_admin login for the owner email.
+// Returns { ownerId, credentials } where credentials is non-null only when a
+// brand-new account was created (so we can show the temp password once).
+async function provisionOwnerAccount(ownerEmail) {
+  const email = ownerEmail.toLowerCase().trim();
+
+  // Is there already an auth user with this email?
+  const { data: list } = await supabase.auth.admin.listUsers();
+  const existing = list?.users?.find(u => (u.email || "").toLowerCase() === email);
+
+  let ownerId, credentials = null;
+  if (existing) {
+    ownerId = existing.id;
+  } else {
+    // Create a new confirmed auth user with a temp password
+    const tempPassword = genTempPassword();
+    const { data: created, error: cErr } = await supabase.auth.admin.createUser({
+      email, password: tempPassword, email_confirm: true,
+    });
+    if (cErr) throw cErr;
+    ownerId = created.user.id;
+    credentials = { email, tempPassword };
+  }
+
+  // Ensure they have the hotel_admin role (upsert so we never duplicate)
+  await supabase.from("user_roles").upsert([{ user_id: ownerId, role: "hotel_admin" }], { onConflict: "user_id" });
+  return { ownerId, credentials };
+}
+
 // POST /api/admin/hotels
-// Creates a hotel, then auto-provisions its wallet so finance is ready
-// immediately. Wallet failure is logged but doesn't block hotel creation.
+// Creates a hotel + wallet. If an owner_email is supplied, also provisions a
+// hotel_admin login for that owner and links the hotel to them. Returns any
+// generated credentials so the admin can hand them to the owner.
 export const adminCreateHotel = async (req, res) => {
   try {
     const hotel = { ...req.body, images: req.body.images || [], amenities: req.body.amenities || [] };
+
+    // Provision owner login first so we can stamp owner_id onto the hotel
+    let credentials = null;
+    if (hotel.owner_email) {
+      try {
+        const { ownerId, credentials: creds } = await provisionOwnerAccount(hotel.owner_email);
+        hotel.owner_id = ownerId;
+        credentials = creds;
+      } catch (e) {
+        console.error("Owner provisioning failed:", e.message);
+        // don't block hotel creation if owner provisioning fails
+      }
+    }
+
     const { data, error } = await supabase.from("hotels").insert([hotel]).select().single();
     if (error) throw error;
     try { await ensureWallet(data.id); } catch (e) { console.error("Wallet create failed:", e.message); }
-    res.status(201).json(data);
+
+    res.status(201).json({ ...data, ownerCredentials: credentials });
   } catch (error) {
     res.status(400).json({ message: error.message });
   }

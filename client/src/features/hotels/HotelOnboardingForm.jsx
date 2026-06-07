@@ -22,6 +22,7 @@ const empty = {
 export default function HotelOnboardingForm({ initial = null, onSaved }) {
   const { user } = useAuth();
   const [uploading, setUploading] = useState(false);
+  const [ownerCreds, setOwnerCreds] = useState(null);
   const [f, setF] = useState(initial ? { ...empty, ...initial, ...(initial.bank_details || {}) } : empty);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
@@ -67,8 +68,13 @@ export default function HotelOnboardingForm({ initial = null, onSaved }) {
         commission_percent: Number(f.commission_percent),
         bank_details: { bank_account_name: f.bank_account_name, bank_account_number: f.bank_account_number, bank_ifsc: f.bank_ifsc, bank_name: f.bank_name },
       };
-      if (initial?.id) await adminApi.updateHotel(initial.id, payload);
-      else await adminApi.createHotel(payload);
+      if (initial?.id) {
+        await adminApi.updateHotel(initial.id, payload);
+      } else {
+        const res = await adminApi.createHotel(payload);
+        // If the backend provisioned a new owner login, surface the credentials
+        if (res?.ownerCredentials) setOwnerCreds(res.ownerCredentials);
+      }
       setOk(true);
       if (onSaved) onSaved();
       if (!initial) setF(empty);
@@ -187,6 +193,18 @@ export default function HotelOnboardingForm({ initial = null, onSaved }) {
 
       {error && <div style={{ color: "#a33", padding: 14, background: "#fff5f5", border: "1px solid #fcc", marginBottom: 16, fontSize: 13 }}>{error}</div>}
       {ok && <div style={{ color: theme.SEA_DARK, padding: 14, background: "#E8F5F3", border: `1px solid ${theme.SEA}33`, marginBottom: 16, fontSize: 13 }}>✓ Hotel saved successfully</div>}
+
+      {ownerCreds && (
+        <div style={{ padding: 20, background: "#FFF8E7", border: "1px solid #E8C97A", marginBottom: 16 }}>
+          <div style={{ fontWeight: 600, color: "#8A6D1F", marginBottom: 10, fontSize: 14 }}>🔑 Owner login created — share these with the owner</div>
+          <div style={{ fontSize: 13, lineHeight: 1.9, fontFamily: "monospace", color: theme.INK }}>
+            <div>Portal: <strong>/hotel-portal/login</strong></div>
+            <div>Email: <strong>{ownerCreds.email}</strong></div>
+            <div>Temp Password: <strong>{ownerCreds.tempPassword}</strong></div>
+          </div>
+          <div style={{ fontSize: 12, color: theme.MUTED, marginTop: 10 }}>The owner should change this password after first login. This is shown only once.</div>
+        </div>
+      )}
 
       <button type="submit" disabled={saving} style={{ background: theme.SEA_DEEP, color: theme.CREAM, border: "none", padding: "16px 40px", fontSize: 13, letterSpacing: "0.15em", textTransform: "uppercase", display: "flex", alignItems: "center", gap: 10, cursor: saving ? "not-allowed" : "pointer", opacity: saving ? 0.7 : 1 }}>
         <Save size={16} /> {saving ? "Saving…" : initial ? "Update Hotel" : "Create Hotel"}
