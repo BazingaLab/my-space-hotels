@@ -1,7 +1,9 @@
 import { useState } from "react";
 import { theme } from "../../lib/theme.js";
 import { adminApi } from "../../lib/api.js";
-import { Save, Building2, User, FileText, MapPin, Clock, IndianRupee, Landmark } from "lucide-react";
+import { Save, Building2, User, FileText, MapPin, Clock, IndianRupee, Landmark, Upload, Image as ImageIcon } from "lucide-react";
+import { supabase } from "../../lib/supabase.js";
+import { useAuth } from "../../context/AuthContext.jsx";
 
 const HOTEL_TYPES = ["Budget", "Premium", "Resort"];
 const TAGS = ["Heritage", "Beachfront", "Luxury", "Boutique", "Mountain", "City"];
@@ -18,12 +20,35 @@ const empty = {
 };
 
 export default function HotelOnboardingForm({ initial = null, onSaved }) {
+  const { user } = useAuth();
+  const [uploading, setUploading] = useState(false);
   const [f, setF] = useState(initial ? { ...empty, ...initial, ...(initial.bank_details || {}) } : empty);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
   const [ok, setOk] = useState(false);
 
   const set = (k, v) => setF(s => ({ ...s, [k]: v }));
+
+  // Upload a cover image to Supabase Storage and store its public URL
+  const handleImageUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) { setError("Only image files allowed."); return; }
+    if (file.size > 5 * 1024 * 1024) { setError("Max file size is 5MB."); return; }
+    setUploading(true); setError(null);
+    try {
+      const ext = file.name.split(".").pop();
+      const path = `${user?.id || "admin"}/onboarding/${Date.now()}.${ext}`;
+      const { error: upErr } = await supabase.storage.from("hotel-photos").upload(path, file, { cacheControl: "3600", upsert: false });
+      if (upErr) throw upErr;
+      const { data: { publicUrl } } = supabase.storage.from("hotel-photos").getPublicUrl(path);
+      set("cover_image", publicUrl);
+    } catch (err) {
+      setError(`Image upload failed: ${err.message}`);
+    } finally {
+      setUploading(false);
+    }
+  };
   const toggleAmenity = (a) => setF(s => ({ ...s, amenities: s.amenities.includes(a) ? s.amenities.filter(x => x !== a) : [...s.amenities, a] }));
 
   const submit = async (e) => {
@@ -80,7 +105,23 @@ export default function HotelOnboardingForm({ initial = null, onSaved }) {
         <div style={{ ...grid3, marginTop: 16 }}>
           <Field label="Total Rooms" k="rooms" type="number" />
           <Field label="Price / Night (₹)" k="price" type="number" req />
-          <Field label="Cover Image URL" k="cover_image" ph="https://..." />
+          <div>
+            <label style={lbl}>Cover Image</label>
+            <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
+              <div>
+                <input id="coverUpload" type="file" accept="image/*" style={{ display: "none" }} onChange={handleImageUpload} />
+                <label htmlFor="coverUpload" style={{ display: "flex", alignItems: "center", gap: 8, padding: "11px 18px", border: `1px dashed ${theme.SEA}`, background: `${theme.SEA}10`, color: theme.SEA_DARK, fontSize: 13, cursor: "pointer", whiteSpace: "nowrap" }}>
+                  <Upload size={15} /> {uploading ? "Uploading…" : "Upload Image"}
+                </label>
+              </div>
+              {f.cover_image ? (
+                <img src={f.cover_image} alt="cover" style={{ width: 90, height: 60, objectFit: "cover", border: `1px solid ${theme.SAND}` }} />
+              ) : (
+                <div style={{ width: 90, height: 60, border: `1px solid ${theme.SAND}`, display: "grid", placeItems: "center", color: theme.MUTED }}><ImageIcon size={20} /></div>
+              )}
+            </div>
+            <input style={{ ...inp, marginTop: 10 }} placeholder="…or paste an image URL" value={f.cover_image || ""} onChange={e => set("cover_image", e.target.value)} />
+          </div>
         </div>
         <div style={{ marginTop: 16 }}><Field label="Short Description" k="short_description" /></div>
         <div style={{ marginTop: 16 }}><label style={lbl}>Full Description</label><textarea style={{ ...inp, minHeight: 90, resize: "vertical" }} value={f.description} onChange={e => set("description", e.target.value)} /></div>
