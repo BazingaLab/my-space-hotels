@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 import { supabase } from "../lib/supabase.js";
 
@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 
 export default function MyBookings() {
+  const navigate = useNavigate();
   const { user } = useAuth();
 
   const [bookings, setBookings] =
@@ -406,6 +407,7 @@ export default function MyBookings() {
               return (
                 <div
                   key={b.id}
+                  onClick={() => navigate(`/my-bookings/${b.id}`)}
                   style={{
                     background:
                       "#fff",
@@ -416,6 +418,7 @@ export default function MyBookings() {
                       "200px 1fr auto",
                     overflow:
                       "hidden",
+                    cursor: "pointer",
                   }}
                 >
                   {/* IMAGE */}

@@ -55,6 +55,7 @@ export const complaintsApi = {
   create: (data) => request("/api/complaints", { method: "POST", body: JSON.stringify(data) }),
   update: (id, patch) => request(`/api/complaints/${id}`, { method: "PATCH", body: JSON.stringify(patch) }),
   resolve: (id, notes) => request(`/api/complaints/${id}/resolve`, { method: "POST", body: JSON.stringify({ resolution_notes: notes }) }),
+  assign: (id, memberId) => request(`/api/complaints/${id}/assign`, { method: "POST", body: JSON.stringify({ assigned_team_member: memberId }) }),
 };
 
 export const customersApi = {
@@ -94,4 +95,14 @@ export const teamApi = {
   create: (data) => request("/api/team", { method: "POST", body: JSON.stringify(data) }),
   update: (id, patch) => request(`/api/team/${id}`, { method: "PATCH", body: JSON.stringify(patch) }),
   remove: (id) => request(`/api/team/${id}`, { method: "DELETE" }),
+};
+
+export const guestBookingApi = {
+  detail: (id) => request(`/api/guest-bookings/${id}`),
+  cancel: (id, user_id) => request(`/api/guest-bookings/${id}/cancel`, { method: "POST", body: JSON.stringify({ user_id }) }),
+};
+
+export const reviewApi = {
+  create: (data) => request("/api/reviews", { method: "POST", body: JSON.stringify(data) }),
+  byHotel: (hotelId) => request(`/api/reviews/hotel/${hotelId}`),
 };

@@ -27,6 +27,7 @@ import Booking from "./pages/Booking.jsx";
 import Login from "./pages/Login.jsx";
 import Signup from "./pages/Signup.jsx";
 import MyBookings from "./pages/MyBookings.jsx";
+import BookingDetail from "./pages/BookingDetail.jsx";
 import ListProperty from "./pages/ListProperty.jsx";
 
 /* =========================
@@ -140,6 +141,15 @@ function AppRoutes() {
           element={
             <ProtectedRoute>
               <MyBookings />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/my-bookings/:id"
+          element={
+            <ProtectedRoute>
+              <BookingDetail />
             </ProtectedRoute>
           }
         />
