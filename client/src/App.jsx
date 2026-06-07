@@ -45,6 +45,7 @@ import AdminCustomerDetail from "./pages/admin/AdminCustomerDetail.jsx";
 import AdminWallets from "./pages/admin/AdminWallets.jsx";
 import AdminUsers from "./pages/admin/AdminUsers.jsx";
 import AdminPending from "./pages/admin/AdminPending.jsx";
+import AdminTeam from "./pages/admin/AdminTeam.jsx";
 
 /* =========================
    HOTEL PORTAL PAGES
@@ -238,6 +239,15 @@ function AppRoutes() {
           element={
             <ProtectedRoute requireAdmin>
               <AdminUsers />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/admin/team"
+          element={
+            <ProtectedRoute requireAdmin>
+              <AdminTeam />
             </ProtectedRoute>
           }
         />

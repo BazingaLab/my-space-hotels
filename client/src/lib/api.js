@@ -84,3 +84,14 @@ export const bookingMgmtApi = {
   transfer: (id, new_hotel_id) => request(`/api/booking-mgmt/${id}/transfer`, { method: "POST", body: JSON.stringify({ new_hotel_id }) }),
   update: (id, patch) => request(`/api/booking-mgmt/${id}`, { method: "PATCH", body: JSON.stringify(patch) }),
 };
+
+export const teamApi = {
+  list: (filters = {}) => {
+    const qs = new URLSearchParams(Object.entries(filters).filter(([_, v]) => v)).toString();
+    return request(`/api/team${qs ? `?${qs}` : ""}`);
+  },
+  stats: () => request("/api/team/stats"),
+  create: (data) => request("/api/team", { method: "POST", body: JSON.stringify(data) }),
+  update: (id, patch) => request(`/api/team/${id}`, { method: "PATCH", body: JSON.stringify(patch) }),
+  remove: (id) => request(`/api/team/${id}`, { method: "DELETE" }),
+};
