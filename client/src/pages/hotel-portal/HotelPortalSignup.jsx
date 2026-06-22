@@ -1,14 +1,11 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext.jsx";
-import { adminApi } from "../../lib/api.js";
 import { theme } from "../../lib/theme.js";
 import { Building2, Mail, Lock, User, ArrowRight, CheckCircle2, Eye, EyeOff } from "lucide-react";
+import { supabase } from "../../lib/supabase.js";
 
 export default function HotelPortalSignup() {
-  const { signUp } = useAuth();
-  const navigate = useNavigate();
-
   const [form, setForm] = useState({ fullName: "", email: "", password: "", confirm: "" });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -25,26 +22,21 @@ export default function HotelPortalSignup() {
 
     setLoading(true);
     try {
-      // 1. Create the auth account
-      const data = await signUp(form.email, form.password, form.fullName);
-      const userId = data?.user?.id;
-      if (!userId) throw new Error("Sign up failed. Please try again.");
-
-      // 2. Promote to hotel_admin — wait briefly first so auth.users FK is committed
-      // Supabase occasionally needs a moment before the new user is referenceable
-      await new Promise(r => setTimeout(r, 1500));
-      let promoted = false;
-      for (let attempt = 1; attempt <= 3; attempt++) {
-        try {
-          await adminApi.promoteUser({ user_id: userId, role: "hotel_admin" });
-          promoted = true;
-          break;
-        } catch (e) {
-          if (attempt === 3) throw e;
-          await new Promise(r => setTimeout(r, 1000 * attempt));
-        }
-      }
-
+      // Sign up with signup_intent metadata so the callback page knows
+      // to assign hotel_admin role after email confirmation
+      const { data, error: signUpError } = await supabase.auth.signUp({
+        email: form.email,
+        password: form.password,
+        options: {
+          data: {
+            full_name: form.fullName,
+            signup_intent: "hotel_owner",
+          },
+          // After clicking the confirmation link, redirect here
+          emailRedirectTo: `${window.location.origin}/auth/callback`,
+        },
+      });
+      if (signUpError) throw signUpError;
       setSuccess(true);
     } catch (err) {
       setError(err.message || "Unable to sign up");
@@ -59,15 +51,16 @@ export default function HotelPortalSignup() {
   if (success) {
     return (
       <div style={{ minHeight: "100vh", background: theme.SEA_DEEP, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
-        <div style={{ background: theme.CREAM, width: "100%", maxWidth: 460, padding: 48, textAlign: "center" }}>
+        <div style={{ background: theme.CREAM, width: "100%", maxWidth: 480, padding: 48, textAlign: "center" }}>
           <CheckCircle2 size={56} color={theme.SEA} style={{ marginBottom: 20 }} />
-          <h1 className="serif" style={{ fontSize: 34, fontWeight: 400, marginBottom: 12 }}>Account Created</h1>
-          <p style={{ color: theme.MUTED, lineHeight: 1.7, marginBottom: 28 }}>
-            Welcome aboard! Your hotel partner account is ready. Log in to add your first property — our team will review and approve it before it goes live.
+          <h1 className="serif" style={{ fontSize: 34, fontWeight: 400, marginBottom: 12 }}>Check your email</h1>
+          <p style={{ color: theme.MUTED, lineHeight: 1.7, marginBottom: 8 }}>
+            We've sent a confirmation link to <strong style={{ color: theme.INK }}>{form.email}</strong>.
           </p>
-          <button onClick={() => navigate("/hotel-portal/login")} style={{ background: theme.SEA_DEEP, color: theme.CREAM, border: "none", padding: "14px 28px", fontSize: 13, letterSpacing: "0.15em", textTransform: "uppercase", cursor: "pointer" }}>
-            Go to Login
-          </button>
+          <p style={{ color: theme.MUTED, lineHeight: 1.7, marginBottom: 28 }}>
+            Click the link in the email to verify your address and activate your partner account. Then log in to add your first property.
+          </p>
+          <Link to="/hotel-portal/login" style={{ color: theme.SEA_DARK, fontSize: 14 }}>Back to login →</Link>
         </div>
       </div>
     );
@@ -75,7 +68,6 @@ export default function HotelPortalSignup() {
 
   return (
     <div style={{ minHeight: "100vh", display: "grid", gridTemplateColumns: "1fr 1fr" }}>
-      {/* Left brand panel */}
       <div style={{ background: theme.SEA_DEEP, padding: "80px 60px", display: "flex", flexDirection: "column", justifyContent: "space-between", position: "relative", overflow: "hidden" }}>
         <div style={{ position: "absolute", right: -60, top: -60, width: 300, height: 300, border: "1px solid rgba(255,255,255,0.1)", borderRadius: "50%" }} />
         <div style={{ display: "flex", alignItems: "center", gap: 10, position: "relative" }}>
@@ -105,7 +97,6 @@ export default function HotelPortalSignup() {
         </div>
       </div>
 
-      {/* Right form panel */}
       <div style={{ padding: "80px 60px", display: "flex", flexDirection: "column", justifyContent: "center", background: theme.CREAM }}>
         <div style={{ maxWidth: 400, width: "100%" }}>
           <div style={{ fontSize: 11, letterSpacing: "0.3em", color: theme.SEA_DARK, marginBottom: 16, textTransform: "uppercase" }}>— Partner Sign Up</div>
@@ -119,7 +110,6 @@ export default function HotelPortalSignup() {
                 <input required style={inp} value={form.fullName} onChange={e => set("fullName", e.target.value)} placeholder="Your name" />
               </div>
             </div>
-
             <div>
               <label style={lbl}>Email</label>
               <div style={{ position: "relative" }}>
@@ -127,7 +117,6 @@ export default function HotelPortalSignup() {
                 <input required type="email" style={inp} value={form.email} onChange={e => set("email", e.target.value)} placeholder="your@email.com" />
               </div>
             </div>
-
             <div>
               <label style={lbl}>Password</label>
               <div style={{ position: "relative" }}>
@@ -138,7 +127,6 @@ export default function HotelPortalSignup() {
                 </button>
               </div>
             </div>
-
             <div>
               <label style={lbl}>Confirm Password</label>
               <div style={{ position: "relative" }}>
@@ -146,14 +134,11 @@ export default function HotelPortalSignup() {
                 <input required type={showPassword ? "text" : "password"} style={inp} value={form.confirm} onChange={e => set("confirm", e.target.value)} placeholder="Re-enter password" />
               </div>
             </div>
-
             {error && <div style={{ color: "#a33", fontSize: 13, padding: "12px 16px", background: "#fff5f5", border: "1px solid #fcc" }}>{error}</div>}
-
             <button type="submit" disabled={loading} style={{ background: theme.SEA_DEEP, color: theme.CREAM, border: "none", padding: 16, fontSize: 13, letterSpacing: "0.15em", textTransform: "uppercase", fontWeight: 500, display: "flex", alignItems: "center", justifyContent: "center", gap: 10, cursor: loading ? "not-allowed" : "pointer", opacity: loading ? 0.7 : 1 }}>
               {loading ? "Creating account…" : <><span>Create Account</span><ArrowRight size={14} /></>}
             </button>
           </form>
-
           <p style={{ fontSize: 12, color: theme.MUTED, marginTop: 24, textAlign: "center" }}>
             By signing up you agree to list properties subject to admin review.
           </p>
