@@ -2,18 +2,19 @@ import { Link, useLocation, useNavigate, Navigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext.jsx";
 import { useHotelPortal } from "../../context/HotelPortalContext.jsx";
 import { theme } from "../../lib/theme.js";
-import { LayoutDashboard, Building2, Image, CalendarCheck, LogOut, Sparkles, ChevronRight, ExternalLink } from "lucide-react";
+import { LayoutDashboard, Building2, Image, CalendarCheck, Wallet, LogOut, Sparkles, ChevronRight, ExternalLink, PlusCircle, Check } from "lucide-react";
 
 const navItems = [
   { path: "/hotel-portal", label: "Dashboard", icon: LayoutDashboard },
   { path: "/hotel-portal/property", label: "My Property", icon: Building2 },
   { path: "/hotel-portal/photos", label: "Photo Manager", icon: Image },
   { path: "/hotel-portal/bookings", label: "Bookings", icon: CalendarCheck },
+  { path: "/hotel-portal/wallet", label: "Wallet", icon: Wallet },
 ];
 
 export default function HotelPortalLayout({ children }) {
   const { user, signOut } = useAuth();
-  const { myHotel, isHotelier, loading } = useHotelPortal();
+  const { myHotel, myHotels, activeHotelId, setActiveHotelId, isHotelier, loading } = useHotelPortal();
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -77,16 +78,50 @@ export default function HotelPortalLayout({ children }) {
           </Link>
         </div>
 
-        {/* Hotel name */}
-        {myHotel && (
+        {/* Property switcher */}
+        {myHotels && myHotels.length > 0 && (
           <div style={{ padding: "20px 24px", borderBottom: "1px solid rgba(255,255,255,0.1)" }}>
-            <div style={{ fontSize: 10, letterSpacing: "0.2em", color: "rgba(255,255,255,0.5)", textTransform: "uppercase", marginBottom: 6 }}>Managing</div>
-            <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>{myHotel.name}</div>
-            <div style={{ fontSize: 12, color: "rgba(255,255,255,0.6)" }}>{myHotel.city}, {myHotel.state}</div>
-            <div style={{ marginTop: 8, display: "flex", alignItems: "center", gap: 6 }}>
-              <div style={{ width: 8, height: 8, borderRadius: "50%", background: myHotel.available ? "#4ade80" : "#f87171" }} />
-              <span style={{ fontSize: 11, color: "rgba(255,255,255,0.7)" }}>{myHotel.available ? "Live" : "Paused"}</span>
+            <div style={{ fontSize: 10, letterSpacing: "0.2em", color: "rgba(255,255,255,0.5)", textTransform: "uppercase", marginBottom: 10 }}>
+              {myHotels.length > 1 ? `Managing ${myHotels.length} Properties` : "Managing"}
             </div>
+
+            {myHotels.length > 1 ? (
+              <select
+                value={activeHotelId || ""}
+                onChange={(e) => setActiveHotelId(e.target.value)}
+                style={{
+                  width: "100%", padding: "10px 12px", marginBottom: 10,
+                  background: "rgba(255,255,255,0.1)", color: theme.CREAM,
+                  border: "1px solid rgba(255,255,255,0.2)", fontSize: 13,
+                  fontFamily: "Inter, sans-serif", cursor: "pointer", borderRadius: 2,
+                }}
+              >
+                {myHotels.map(h => (
+                  <option key={h.id} value={h.id} style={{ color: theme.INK }}>{h.name} — {h.city}</option>
+                ))}
+              </select>
+            ) : (
+              <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>{myHotel?.name}</div>
+            )}
+
+            {myHotel && (
+              <>
+                {myHotels.length === 1 && <div style={{ fontSize: 12, color: "rgba(255,255,255,0.6)" }}>{myHotel.city}, {myHotel.state}</div>}
+                <div style={{ marginTop: 8, display: "flex", alignItems: "center", gap: 6 }}>
+                  <div style={{ width: 8, height: 8, borderRadius: "50%", background: myHotel.available ? "#4ade80" : "#f87171" }} />
+                  <span style={{ fontSize: 11, color: "rgba(255,255,255,0.7)" }}>{myHotel.available ? "Live" : "Paused"}</span>
+                </div>
+              </>
+            )}
+
+            <Link to="/hotel-portal/add-property" style={{
+              display: "flex", alignItems: "center", gap: 8, marginTop: 14,
+              padding: "10px 12px", textDecoration: "none",
+              color: theme.CREAM, background: "rgba(255,255,255,0.12)",
+              fontSize: 13, borderRadius: 2, border: "1px solid rgba(255,255,255,0.15)",
+            }}>
+              <PlusCircle size={16} /> Add Another Property
+            </Link>
           </div>
         )}
 
