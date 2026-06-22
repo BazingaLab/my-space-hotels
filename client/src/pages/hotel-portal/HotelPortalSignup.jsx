@@ -30,8 +30,20 @@ export default function HotelPortalSignup() {
       const userId = data?.user?.id;
       if (!userId) throw new Error("Sign up failed. Please try again.");
 
-      // 2. Promote the new account to hotel_admin so they can access the portal
-      await adminApi.promoteUser({ user_id: userId, role: "hotel_admin" });
+      // 2. Promote to hotel_admin — wait briefly first so auth.users FK is committed
+      // Supabase occasionally needs a moment before the new user is referenceable
+      await new Promise(r => setTimeout(r, 1500));
+      let promoted = false;
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        try {
+          await adminApi.promoteUser({ user_id: userId, role: "hotel_admin" });
+          promoted = true;
+          break;
+        } catch (e) {
+          if (attempt === 3) throw e;
+          await new Promise(r => setTimeout(r, 1000 * attempt));
+        }
+      }
 
       setSuccess(true);
     } catch (err) {
