@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { theme } from "../../lib/theme.js";
 import { adminApi } from "../../lib/api.js";
-import { Save, Building2, User, FileText, MapPin, Clock, IndianRupee, Landmark, Upload, Image as ImageIcon } from "lucide-react";
-import { supabase } from "../../lib/supabase.js";
 import { useAuth } from "../../context/AuthContext.jsx";
+import { supabase } from "../../lib/supabase.js";
+import { Save, Building2, User, FileText, MapPin, Clock, IndianRupee, Landmark, Upload, Image as ImageIcon } from "lucide-react";
 
 const HOTEL_TYPES = ["Budget", "Premium", "Resort"];
 const TAGS = ["Heritage", "Beachfront", "Luxury", "Boutique", "Mountain", "City"];
@@ -21,18 +21,19 @@ const empty = {
 
 export default function HotelOnboardingForm({ initial = null, onSaved }) {
   const { user } = useAuth();
-  const [uploading, setUploading] = useState(false);
-  const [ownerCreds, setOwnerCreds] = useState(null);
   const [f, setF] = useState(initial ? { ...empty, ...initial, ...(initial.bank_details || {}) } : empty);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
   const [ok, setOk] = useState(false);
+  const [ownerCreds, setOwnerCreds] = useState(null);
+  const [uploading, setUploading] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
 
   const set = (k, v) => setF(s => ({ ...s, [k]: v }));
+  const toggleAmenity = (a) => setF(s => ({ ...s, amenities: s.amenities.includes(a) ? s.amenities.filter(x => x !== a) : [...s.amenities, a] }));
 
-  // Upload a cover image to Supabase Storage and store its public URL
-  const handleImageUpload = async (e) => {
-    const file = e.target.files?.[0];
+  // Upload cover image to Supabase Storage; store its public URL
+  const uploadCover = async (file) => {
     if (!file) return;
     if (!file.type.startsWith("image/")) { setError("Only image files allowed."); return; }
     if (file.size > 5 * 1024 * 1024) { setError("Max file size is 5MB."); return; }
@@ -44,17 +45,13 @@ export default function HotelOnboardingForm({ initial = null, onSaved }) {
       if (upErr) throw upErr;
       const { data: { publicUrl } } = supabase.storage.from("hotel-photos").getPublicUrl(path);
       set("cover_image", publicUrl);
-    } catch (err) {
-      setError(`Image upload failed: ${err.message}`);
-    } finally {
-      setUploading(false);
-    }
+    } catch (e) { setError(`Image upload failed: ${e.message}`); }
+    finally { setUploading(false); }
   };
-  const toggleAmenity = (a) => setF(s => ({ ...s, amenities: s.amenities.includes(a) ? s.amenities.filter(x => x !== a) : [...s.amenities, a] }));
 
   const submit = async (e) => {
     e.preventDefault();
-    setSaving(true); setError(null); setOk(false);
+    setSaving(true); setError(null); setOk(false); setOwnerCreds(null);
     try {
       const payload = {
         name: f.name, hotel_type: f.hotel_type, owner_name: f.owner_name, contact_number: f.contact_number,
@@ -72,7 +69,7 @@ export default function HotelOnboardingForm({ initial = null, onSaved }) {
         await adminApi.updateHotel(initial.id, payload);
       } else {
         const res = await adminApi.createHotel(payload);
-        // If the backend provisioned a new owner login, surface the credentials
+        // Show auto-provisioned owner credentials if a new login was created
         if (res?.ownerCredentials) setOwnerCreds(res.ownerCredentials);
       }
       setOk(true);
@@ -108,27 +105,48 @@ export default function HotelOnboardingForm({ initial = null, onSaved }) {
           <div><label style={lbl}>Category Tag</label><select style={inp} value={f.tag} onChange={e => set("tag", e.target.value)}>{TAGS.map(t => <option key={t}>{t}</option>)}</select></div>
           <div><label style={lbl}>Status</label><select style={inp} value={f.hotel_status} onChange={e => set("hotel_status", e.target.value)}><option value="active">Active</option><option value="inactive">Inactive</option></select></div>
         </div>
-        <div style={{ ...grid3, marginTop: 16 }}>
+        <div style={{ ...grid2, marginTop: 16 }}>
           <Field label="Total Rooms" k="rooms" type="number" />
           <Field label="Price / Night (₹)" k="price" type="number" req />
-          <div>
-            <label style={lbl}>Cover Image</label>
-            <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
-              <div>
-                <input id="coverUpload" type="file" accept="image/*" style={{ display: "none" }} onChange={handleImageUpload} />
-                <label htmlFor="coverUpload" style={{ display: "flex", alignItems: "center", gap: 8, padding: "11px 18px", border: `1px dashed ${theme.SEA}`, background: `${theme.SEA}10`, color: theme.SEA_DARK, fontSize: 13, cursor: "pointer", whiteSpace: "nowrap" }}>
-                  <Upload size={15} /> {uploading ? "Uploading…" : "Upload Image"}
-                </label>
-              </div>
-              {f.cover_image ? (
-                <img src={f.cover_image} alt="cover" style={{ width: 90, height: 60, objectFit: "cover", border: `1px solid ${theme.SAND}` }} />
-              ) : (
-                <div style={{ width: 90, height: 60, border: `1px solid ${theme.SAND}`, display: "grid", placeItems: "center", color: theme.MUTED }}><ImageIcon size={20} /></div>
-              )}
-            </div>
-            <input style={{ ...inp, marginTop: 10 }} placeholder="…or paste an image URL" value={f.cover_image || ""} onChange={e => set("cover_image", e.target.value)} />
-          </div>
         </div>
+
+        {/* Cover image — drag & drop + click + URL fallback */}
+        <div style={{ marginTop: 16 }}>
+          <label style={lbl}>Cover Image</label>
+          <div
+            onClick={() => document.getElementById("coverUploadAdmin").click()}
+            onDragEnter={e => { e.preventDefault(); setIsDragging(true); }}
+            onDragOver={e => { e.preventDefault(); setIsDragging(true); }}
+            onDragLeave={e => { e.preventDefault(); if (e.currentTarget.contains(e.relatedTarget)) return; setIsDragging(false); }}
+            onDrop={e => { e.preventDefault(); setIsDragging(false); uploadCover(e.dataTransfer.files?.[0]); }}
+            style={{
+              border: `2px dashed ${isDragging ? theme.SEA : theme.SAND}`,
+              background: isDragging ? `${theme.SEA}10` : "#fff",
+              padding: 20, cursor: "pointer", transition: "all 0.15s ease",
+              display: "flex", alignItems: "center", gap: 16,
+              justifyContent: f.cover_image ? "flex-start" : "center",
+            }}
+          >
+            <input id="coverUploadAdmin" type="file" accept="image/*" style={{ display: "none" }} onChange={e => uploadCover(e.target.files?.[0])} />
+            {f.cover_image ? (
+              <img src={f.cover_image} alt="cover" style={{ width: 90, height: 60, objectFit: "cover", border: `1px solid ${theme.SAND}` }} />
+            ) : (
+              <div style={{ width: 44, height: 44, borderRadius: "50%", background: `${theme.SEA}15`, display: "grid", placeItems: "center" }}>
+                {uploading
+                  ? <div style={{ width: 18, height: 18, border: `2px solid ${theme.SEA}`, borderTopColor: "transparent", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
+                  : <Upload size={18} color={theme.SEA} />}
+              </div>
+            )}
+            <div>
+              <div style={{ fontSize: 14, fontWeight: 500, color: isDragging ? theme.SEA_DARK : theme.INK }}>
+                {uploading ? "Uploading…" : isDragging ? "Drop image here" : f.cover_image ? "Click to replace image" : "Click or drag & drop cover image"}
+              </div>
+              <div style={{ fontSize: 12, color: theme.MUTED, marginTop: 2 }}>JPG, PNG, WebP · Max 5MB</div>
+            </div>
+          </div>
+          <input style={{ ...inp, marginTop: 10 }} placeholder="…or paste an image URL" value={f.cover_image || ""} onChange={e => set("cover_image", e.target.value)} />
+        </div>
+
         <div style={{ marginTop: 16 }}><Field label="Short Description" k="short_description" /></div>
         <div style={{ marginTop: 16 }}><label style={lbl}>Full Description</label><textarea style={{ ...inp, minHeight: 90, resize: "vertical" }} value={f.description} onChange={e => set("description", e.target.value)} /></div>
       </Section>
@@ -194,6 +212,7 @@ export default function HotelOnboardingForm({ initial = null, onSaved }) {
       {error && <div style={{ color: "#a33", padding: 14, background: "#fff5f5", border: "1px solid #fcc", marginBottom: 16, fontSize: 13 }}>{error}</div>}
       {ok && <div style={{ color: theme.SEA_DARK, padding: 14, background: "#E8F5F3", border: `1px solid ${theme.SEA}33`, marginBottom: 16, fontSize: 13 }}>✓ Hotel saved successfully</div>}
 
+      {/* Auto-provisioned owner credentials — shown once after hotel creation */}
       {ownerCreds && (
         <div style={{ padding: 20, background: "#FFF8E7", border: "1px solid #E8C97A", marginBottom: 16 }}>
           <div style={{ fontWeight: 600, color: "#8A6D1F", marginBottom: 10, fontSize: 14 }}>🔑 Owner login created — share these with the owner</div>
@@ -202,13 +221,15 @@ export default function HotelOnboardingForm({ initial = null, onSaved }) {
             <div>Email: <strong>{ownerCreds.email}</strong></div>
             <div>Temp Password: <strong>{ownerCreds.tempPassword}</strong></div>
           </div>
-          <div style={{ fontSize: 12, color: theme.MUTED, marginTop: 10 }}>The owner should change this password after first login. This is shown only once.</div>
+          <div style={{ fontSize: 12, color: theme.MUTED, marginTop: 10 }}>Shown only once — the owner should change this password after first login.</div>
         </div>
       )}
 
       <button type="submit" disabled={saving} style={{ background: theme.SEA_DEEP, color: theme.CREAM, border: "none", padding: "16px 40px", fontSize: 13, letterSpacing: "0.15em", textTransform: "uppercase", display: "flex", alignItems: "center", gap: 10, cursor: saving ? "not-allowed" : "pointer", opacity: saving ? 0.7 : 1 }}>
         <Save size={16} /> {saving ? "Saving…" : initial ? "Update Hotel" : "Create Hotel"}
       </button>
+
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </form>
   );
 }
