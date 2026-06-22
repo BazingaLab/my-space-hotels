@@ -211,15 +211,7 @@ export default function Home() {
               }}>
                 <Building2 size={16} /> Register as Partner
               </Link>
-              <Link to="/list-property" style={{
-                background: "transparent", color: "rgba(255,255,255,0.7)",
-                border: "1px solid rgba(255,255,255,0.2)",
-                padding: "16px 32px", textDecoration: "none", fontSize: 13,
-                letterSpacing: "0.15em", textTransform: "uppercase",
-                display: "inline-flex", alignItems: "center", gap: 10,
-              }}>
-                Submit a Property <ArrowRight size={14} />
-              </Link>
+
             </div>
 
             <p style={{ fontSize: 12, color: "rgba(255,255,255,0.3)", marginTop: 16 }}>
