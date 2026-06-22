@@ -5,7 +5,8 @@ import { useHotelPortal } from "../../context/HotelPortalContext.jsx";
 import { useAuth } from "../../context/AuthContext.jsx";
 import { pendingApi } from "../../lib/api.js";
 import { theme } from "../../lib/theme.js";
-import { Building2, Send, CheckCircle2 } from "lucide-react";
+import { Building2, Send, CheckCircle2, Upload, Image as ImageIcon } from "lucide-react";
+import { supabase } from "../../lib/supabase.js";
 
 const TAGS = ["Heritage", "Beachfront", "Luxury", "Boutique", "Mountain", "City"];
 
@@ -22,8 +23,29 @@ export default function AddProperty() {
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
   const [error, setError] = useState(null);
+  const [uploading, setUploading] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
 
   const set = (k, v) => setForm(s => ({ ...s, [k]: v }));
+
+  const uploadCover = async (file) => {
+    if (!file) return;
+    if (!file.type.startsWith("image/")) { setError("Only image files allowed."); return; }
+    if (file.size > 5 * 1024 * 1024) { setError("Max file size is 5MB."); return; }
+    setUploading(true); setError(null);
+    try {
+      const ext = file.name.split(".").pop();
+      const path = `${user.id}/new-property/${Date.now()}.${ext}`;
+      const { error: upErr } = await supabase.storage.from("hotel-photos").upload(path, file, { cacheControl: "3600", upsert: false });
+      if (upErr) throw upErr;
+      const { data: { publicUrl } } = supabase.storage.from("hotel-photos").getPublicUrl(path);
+      set("cover_image", publicUrl);
+    } catch (e) {
+      setError(`Image upload failed: ${e.message}`);
+    } finally {
+      setUploading(false);
+    }
+  };
 
   const submit = async () => {
     setError(null);
@@ -94,7 +116,39 @@ export default function AddProperty() {
             <div><label style={lbl}>Rooms</label><input type="number" style={inp} value={form.rooms} onChange={e => set("rooms", e.target.value)} /></div>
           </div>
 
-          <div><label style={lbl}>Cover Image URL</label><input style={inp} value={form.cover_image} onChange={e => set("cover_image", e.target.value)} placeholder="https://… (you can add more photos after approval)" /></div>
+          <div>
+            <label style={lbl}>Cover Image</label>
+            <div
+              onClick={() => document.getElementById("coverDrop").click()}
+              onDragEnter={e => { e.preventDefault(); setIsDragging(true); }}
+              onDragOver={e => { e.preventDefault(); setIsDragging(true); }}
+              onDragLeave={e => { e.preventDefault(); if (e.currentTarget.contains(e.relatedTarget)) return; setIsDragging(false); }}
+              onDrop={e => { e.preventDefault(); setIsDragging(false); uploadCover(e.dataTransfer.files?.[0]); }}
+              style={{
+                border: `2px dashed ${isDragging ? theme.SEA : theme.SAND}`,
+                background: isDragging ? `${theme.SEA}10` : "#fff",
+                padding: 24, textAlign: "center", cursor: "pointer",
+                transition: "all 0.15s ease", display: "flex", alignItems: "center", gap: 16,
+                justifyContent: form.cover_image ? "flex-start" : "center",
+              }}
+            >
+              <input id="coverDrop" type="file" accept="image/*" style={{ display: "none" }} onChange={e => uploadCover(e.target.files?.[0])} />
+              {form.cover_image ? (
+                <img src={form.cover_image} alt="cover" style={{ width: 90, height: 60, objectFit: "cover", border: `1px solid ${theme.SAND}` }} />
+              ) : (
+                <div style={{ width: 48, height: 48, borderRadius: "50%", background: `${theme.SEA}15`, display: "grid", placeItems: "center" }}>
+                  {uploading ? <div style={{ width: 20, height: 20, border: `2px solid ${theme.SEA}`, borderTopColor: "transparent", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} /> : <Upload size={20} color={theme.SEA} />}
+                </div>
+              )}
+              <div style={{ textAlign: "left" }}>
+                <div style={{ fontSize: 14, fontWeight: 500, color: isDragging ? theme.SEA_DARK : theme.INK }}>
+                  {uploading ? "Uploading…" : isDragging ? "Drop image here" : form.cover_image ? "Image added — click to replace" : "Click or drag & drop cover image"}
+                </div>
+                <div style={{ fontSize: 12, color: theme.MUTED, marginTop: 2 }}>JPG, PNG, WebP · Max 5MB</div>
+              </div>
+            </div>
+            <input style={{ ...inp, marginTop: 10 }} value={form.cover_image} onChange={e => set("cover_image", e.target.value)} placeholder="…or paste an image URL" />
+          </div>
 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
             <div><label style={lbl}>Contact Number</label><input style={inp} value={form.contact_number} onChange={e => set("contact_number", e.target.value)} /></div>
@@ -111,6 +165,7 @@ export default function AddProperty() {
           </button>
         </div>
       </div>
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </HotelPortalLayout>
   );
 }
