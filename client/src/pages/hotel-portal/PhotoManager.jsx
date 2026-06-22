@@ -26,6 +26,7 @@ export default function PhotoManager() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [preview, setPreview] = useState(null);
+  const [isDragging, setIsDragging] = useState(false);
   const fileRef = useRef();
 
   const loadPhotos = async () => {
@@ -152,17 +153,25 @@ export default function PhotoManager() {
 
           {/* Upload area + photos */}
           <div>
-            {/* Upload zone */}
-            <div style={{ background: "#fff", border: `2px dashed ${theme.SAND}`, padding: 32, textAlign: "center", marginBottom: 24, cursor: "pointer" }}
+            {/* Upload zone — drag & drop with visual feedback */}
+            <div style={{
+                background: isDragging ? `${theme.SEA}10` : "#fff",
+                border: `2px dashed ${isDragging ? theme.SEA : theme.SAND}`,
+                padding: 32, textAlign: "center", marginBottom: 24, cursor: "pointer",
+                transition: "all 0.15s ease",
+                transform: isDragging ? "scale(1.01)" : "scale(1)",
+              }}
               onClick={() => fileRef.current?.click()}
-              onDragOver={e => e.preventDefault()}
-              onDrop={e => { e.preventDefault(); handleUpload({ target: { files: e.dataTransfer.files } }); }}>
+              onDragEnter={e => { e.preventDefault(); setIsDragging(true); }}
+              onDragOver={e => { e.preventDefault(); setIsDragging(true); }}
+              onDragLeave={e => { e.preventDefault(); if (e.currentTarget.contains(e.relatedTarget)) return; setIsDragging(false); }}
+              onDrop={e => { e.preventDefault(); setIsDragging(false); handleUpload({ target: { files: e.dataTransfer.files } }); }}>
               <input ref={fileRef} type="file" accept="image/*" multiple style={{ display: "none" }} onChange={handleUpload} />
-              <div style={{ width: 56, height: 56, borderRadius: "50%", background: `${theme.SEA}15`, display: "grid", placeItems: "center", margin: "0 auto 16px" }}>
+              <div style={{ width: 56, height: 56, borderRadius: "50%", background: `${theme.SEA}15`, display: "grid", placeItems: "center", margin: "0 auto 16px", transform: isDragging ? "scale(1.1)" : "scale(1)", transition: "transform 0.15s ease" }}>
                 {uploading ? <div style={{ width: 24, height: 24, border: `2px solid ${theme.SEA}`, borderTopColor: "transparent", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} /> : <Upload size={24} color={theme.SEA} />}
               </div>
-              <div style={{ fontSize: 15, fontWeight: 500, marginBottom: 4 }}>
-                {uploading ? "Uploading…" : `Upload ${CATEGORIES.find(c => c.id === activeCategory)?.label} Photos`}
+              <div style={{ fontSize: 15, fontWeight: 500, marginBottom: 4, color: isDragging ? theme.SEA_DARK : theme.INK }}>
+                {uploading ? "Uploading…" : isDragging ? "Drop your photos here" : `Upload ${CATEGORIES.find(c => c.id === activeCategory)?.label} Photos`}
               </div>
               <div style={{ fontSize: 13, color: theme.MUTED }}>Click or drag & drop · JPG, PNG, WebP · Max 5MB each</div>
             </div>
