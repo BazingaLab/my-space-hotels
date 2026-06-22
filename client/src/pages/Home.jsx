@@ -1,481 +1,253 @@
-import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
-
-import {
-  Sparkles,
-  User,
-  LogOut,
-  ChevronDown,
-  LayoutDashboard,
-} from "lucide-react";
-
+import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
+import { Star, ArrowRight, ArrowUpRight, Quote, Building2, CheckCircle2 } from "lucide-react";
 import { theme } from "../lib/theme.js";
+import { api } from "../lib/api.js";
+import SearchBar from "../components/SearchBar.jsx";
+import HotelCard from "../components/HotelCard.jsx";
 
-import { useAuth } from "../context/AuthContext.jsx";
-import { useAdmin } from "../context/AdminContext.jsx";
+export default function Home() {
+  const [featured, setFeatured] = useState([]);
+  const [destinations, setDestinations] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-export default function Navbar() {
-  const { user, signOut } = useAuth();
+  useEffect(() => {
+    Promise.all([api.getFeaturedHotels(), api.getPopularDestinations()])
+      .then(([f, d]) => {
+        setFeatured(f.hotels || []);
+        setDestinations(d.destinations || []);
+      })
+      .catch(err => setError(err.message))
+      .finally(() => setLoading(false));
+  }, []);
 
-  const {
-    isAdmin,
-    isHotelAdmin,
-    loading: roleLoading,
-  } = useAdmin();
-
-  const navigate = useNavigate();
-
-  const [dropdownOpen, setDropdownOpen] =
-    useState(false);
-
-  const handleSignOut = async () => {
-    await signOut();
-
-    setDropdownOpen(false);
-
-    navigate("/");
-  };
-
-  const displayName =
-    user?.user_metadata?.full_name?.split(
-      " "
-    )[0] ||
-    user?.email?.split("@")[0] ||
-    "Account";
-
-  // RBAC
-  const showHotelDashboard =
-    !roleLoading &&
-    (isHotelAdmin || isAdmin);
-
-  const showAdminDashboard =
-    !roleLoading && isAdmin;
+  const testimonials = [
+    { name: "Ananya Kapoor", role: "Architect, Mumbai", text: "My Space curated a stay so thoughtful, every detail felt designed for me. The kind of trip you remember in fragments — golden hour, the smell of jasmine, perfect quiet.", img: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200&q=80" },
+    { name: "Rohan Mehta", role: "Filmmaker, Bengaluru", text: "Booking was seamless and the property exceeded every expectation. This isn't aggregation — it's curation. There's a difference, and you feel it instantly.", img: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&q=80" },
+  ];
 
   return (
-    <nav
-      style={{
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        padding: "28px 6vw",
-        borderBottom: `1px solid ${theme.SAND}`,
-        background: theme.CREAM,
-        position: "sticky",
-        top: 0,
-        zIndex: 100,
-      }}
-    >
-      {/* LOGO */}
-      <Link
-        to="/"
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 10,
-          textDecoration: "none",
-          color: theme.INK,
-        }}
-      >
-        <div
-          style={{
-            width: 36,
-            height: 36,
-            borderRadius: "50%",
-            background: theme.SEA,
-            display: "grid",
-            placeItems: "center",
-            color: theme.CREAM,
-          }}
-        >
-          <Sparkles size={16} />
-        </div>
-
-        <div>
-          <div
-            className="serif"
-            style={{
-              fontSize: 22,
-              fontWeight: 500,
-              lineHeight: 1,
-              letterSpacing: "0.5px",
-            }}
-          >
-            My Space
+    <main>
+      {/* HERO */}
+      <section style={{ padding: "80px 6vw 60px" }}>
+        <div className="grid-2-mobile" style={{ display: "grid", gridTemplateColumns: "1.1fr 1fr", gap: 60, alignItems: "center" }}>
+          <div>
+            <div className="fade-up" style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 24 }}>
+              <div style={{ width: 40, height: 1, background: theme.SEA }}></div>
+              <span style={{ fontSize: 11, letterSpacing: "0.3em", color: theme.SEA_DARK, textTransform: "uppercase" }}>Curated Since 2019</span>
+            </div>
+            <h1 className="serif fade-up-2" style={{ fontSize: "clamp(48px, 7vw, 96px)", lineHeight: 1.02, fontWeight: 400, letterSpacing: "-0.02em", marginBottom: 28 }}>
+              Where every<br />
+              <em style={{ color: theme.SEA, fontWeight: 400 }}>stay</em> tells a<br />
+              <span style={{ position: "relative" }}>
+                story.
+                <svg style={{ position: "absolute", left: 0, bottom: -8, width: "100%" }} viewBox="0 0 200 12" preserveAspectRatio="none">
+                  <path d="M2 8 Q 50 2, 100 6 T 198 5" stroke={theme.SEA} strokeWidth="2" fill="none" strokeLinecap="round" />
+                </svg>
+              </span>
+            </h1>
+            <p className="fade-up-3" style={{ fontSize: 17, lineHeight: 1.6, color: "#4A5856", maxWidth: 480, marginBottom: 40, fontWeight: 300 }}>
+              Discover a hand-picked collection of heritage palaces, coastal hideaways, and mountain retreats — each one chosen for its character, not its category.
+            </p>
+            <div className="fade-up-4" style={{ display: "flex", gap: 16, alignItems: "center", flexWrap: "wrap" }}>
+              <Link to="/hotels" className="cta-btn" style={{ padding: "16px 32px", background: theme.SEA, color: theme.CREAM, textDecoration: "none", fontSize: 13, letterSpacing: "0.15em", textTransform: "uppercase", display: "inline-flex", alignItems: "center", gap: 10 }}>
+                Explore Collection <ArrowRight size={14} />
+              </Link>
+              <a href="#" className="link-underline" style={{ fontSize: 13, color: theme.INK, textDecoration: "none", letterSpacing: "0.1em" }}>How we curate →</a>
+            </div>
           </div>
 
-          <div
-            style={{
-              fontSize: 9,
-              letterSpacing: "0.3em",
-              color: theme.SEA_DARK,
-              marginTop: 2,
-            }}
-          >
-            HOTELS
-          </div>
-        </div>
-      </Link>
-
-      {/* MAIN NAV */}
-      <div
-        className="hide-mobile"
-        style={{
-          display: "flex",
-          gap: 36,
-          fontSize: 13,
-        }}
-      >
-        <Link
-          to="/hotels"
-          className="link-underline"
-          style={{
-            color: theme.INK,
-            textDecoration: "none",
-          }}
-        >
-          Stays
-        </Link>
-
-        <Link
-          to="/hotels"
-          className="link-underline"
-          style={{
-            color: theme.INK,
-            textDecoration: "none",
-          }}
-        >
-          Destinations
-        </Link>
-
-        <Link
-          to="/hotel-portal/signup"
-          className="link-underline"
-          style={{
-            color: theme.SEA_DARK,
-            textDecoration: "none",
-            fontWeight: 500,
-          }}
-        >
-          List Property
-        </Link>
-
-        <a
-          href="#"
-          className="link-underline"
-          style={{
-            color: theme.INK,
-            textDecoration: "none",
-          }}
-        >
-          Experiences
-        </a>
-
-        <a
-          href="#"
-          className="link-underline"
-          style={{
-            color: theme.INK,
-            textDecoration: "none",
-          }}
-        >
-          Journal
-        </a>
-      </div>
-
-      {/* AUTH */}
-      <div
-        style={{
-          display: "flex",
-          gap: 16,
-          alignItems: "center",
-        }}
-      >
-        {user ? (
-          // LOGGED IN
-          <div
-            style={{
-              position: "relative",
-            }}
-          >
-            {/* ACCOUNT BUTTON */}
-            <button
-              onClick={() =>
-                setDropdownOpen(
-                  !dropdownOpen
-                )
-              }
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                background: "transparent",
-                border: `1px solid ${theme.SAND}`,
-                padding: "8px 16px",
-                cursor: "pointer",
-                fontSize: 13,
-                color: theme.INK,
-                fontFamily:
-                  "Inter, sans-serif",
-              }}
-            >
-              <div
-                style={{
-                  width: 28,
-                  height: 28,
-                  borderRadius: "50%",
-                  background: theme.SEA,
-                  display: "grid",
-                  placeItems: "center",
-                  color: theme.CREAM,
-                }}
-              >
-                <User size={14} />
-              </div>
-
-              {displayName}
-
-              <ChevronDown
-                size={14}
-                style={{
-                  transform:
-                    dropdownOpen
-                      ? "rotate(180deg)"
-                      : "rotate(0)",
-                  transition:
-                    "transform 0.3s",
-                }}
-              />
-            </button>
-
-            {/* DROPDOWN */}
-            {dropdownOpen && (
-              <div
-                style={{
-                  position: "absolute",
-                  right: 0,
-                  top:
-                    "calc(100% + 8px)",
-                  background: "#fff",
-                  border: `1px solid ${theme.SAND}`,
-                  boxShadow:
-                    "0 12px 40px rgba(0,0,0,0.1)",
-                  minWidth: 220,
-                  zIndex: 200,
-                }}
-              >
-                {/* USER INFO */}
-                <div
-                  style={{
-                    padding: "16px 20px",
-                    borderBottom: `1px solid ${theme.SAND}`,
-                  }}
-                >
-                  <div
-                    style={{
-                      fontSize: 13,
-                      fontWeight: 600,
-                    }}
-                  >
-                    {user?.user_metadata
-                      ?.full_name ||
-                      "Guest"}
-                  </div>
-
-                  <div
-                    style={{
-                      fontSize: 12,
-                      color: theme.MUTED,
-                      marginTop: 2,
-                    }}
-                  >
-                    {user?.email}
-                  </div>
-
-                  {showAdminDashboard && (
-                    <div
-                      style={{
-                        fontSize: 10,
-                        color: theme.SEA,
-                        marginTop: 4,
-                        letterSpacing:
-                          "0.1em",
-                        textTransform:
-                          "uppercase",
-                      }}
-                    >
-                      Super Admin
-                    </div>
-                  )}
-
-                  {!showAdminDashboard &&
-                    showHotelDashboard && (
-                      <div
-                        style={{
-                          fontSize: 10,
-                          color: theme.SEA,
-                          marginTop: 4,
-                          letterSpacing:
-                            "0.1em",
-                          textTransform:
-                            "uppercase",
-                        }}
-                      >
-                        Hotel Admin
-                      </div>
-                    )}
+          <div className="fade-up-3 hide-mobile" style={{ position: "relative", height: 560 }}>
+            <div style={{ position: "absolute", top: 0, right: 0, width: "70%", height: "65%", overflow: "hidden", borderRadius: 2 }}>
+              <img src="https://images.unsplash.com/photo-1564501049412-61c2a3083791?w=900&q=80" alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+            </div>
+            <div style={{ position: "absolute", bottom: 0, left: 0, width: "55%", height: "55%", overflow: "hidden", borderRadius: 2, border: `8px solid ${theme.CREAM}` }}>
+              <img src="https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?w=700&q=80" alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+            </div>
+            <div style={{ position: "absolute", top: "8%", left: "8%", background: theme.CREAM, padding: "14px 18px", boxShadow: "0 12px 40px rgba(0,0,0,0.08)", border: `1px solid ${theme.SAND}` }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <div style={{ display: "flex" }}>
+                  {[...Array(5)].map((_,i) => <Star key={i} size={11} fill={theme.SEA} stroke={theme.SEA} />)}
                 </div>
-
-                {/* MY BOOKINGS */}
-                <Link
-                  to="/my-bookings"
-                  onClick={() =>
-                    setDropdownOpen(
-                      false
-                    )
-                  }
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 10,
-                    padding:
-                      "14px 20px",
-                    textDecoration:
-                      "none",
-                    color: theme.INK,
-                    fontSize: 13,
-                    borderBottom: `1px solid ${theme.SAND}`,
-                  }}
-                >
-                  My Bookings
-                </Link>
-
-                {/* HOTEL DASHBOARD */}
-                {showHotelDashboard && (
-                  <Link
-                    to="/hotel-portal"
-                    onClick={() =>
-                      setDropdownOpen(
-                        false
-                      )
-                    }
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 10,
-                      padding:
-                        "14px 20px",
-                      textDecoration:
-                        "none",
-                      color:
-                        theme.SEA_DARK,
-                      fontSize: 13,
-                      fontWeight: 600,
-                      borderBottom: `1px solid ${theme.SAND}`,
-                    }}
-                  >
-                    <LayoutDashboard
-                      size={14}
-                    />
-                    Hotel Dashboard
-                  </Link>
-                )}
-
-                {/* SUPER ADMIN */}
-                {showAdminDashboard && (
-                  <Link
-                    to="/admin"
-                    onClick={() =>
-                      setDropdownOpen(
-                        false
-                      )
-                    }
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 10,
-                      padding:
-                        "14px 20px",
-                      textDecoration:
-                        "none",
-                      color:
-                        theme.SEA_DARK,
-                      fontSize: 13,
-                      fontWeight: 600,
-                      borderBottom: `1px solid ${theme.SAND}`,
-                    }}
-                  >
-                    <LayoutDashboard
-                      size={14}
-                    />
-                    Super Admin
-                  </Link>
-                )}
-
-                {/* SIGN OUT */}
-                <button
-                  onClick={handleSignOut}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 10,
-                    padding:
-                      "14px 20px",
-                    background:
-                      "transparent",
-                    border: "none",
-                    width: "100%",
-                    textAlign: "left",
-                    cursor: "pointer",
-                    fontSize: 13,
-                    color: "#a33",
-                    fontFamily:
-                      "Inter, sans-serif",
-                  }}
-                >
-                  <LogOut size={14} />
-                  Sign Out
-                </button>
+                <span style={{ fontSize: 11, fontWeight: 600 }}>4.9 / 5</span>
               </div>
-            )}
+              <div style={{ fontSize: 10, color: theme.MUTED, marginTop: 4, letterSpacing: "0.05em" }}>From 12,400+ guests</div>
+            </div>
+            <div className="serif" style={{ position: "absolute", bottom: "18%", right: "-2%", fontSize: 13, fontStyle: "italic", color: theme.SEA_DARK, background: theme.CREAM, padding: "10px 18px", border: `1px solid ${theme.SEA}33` }}>
+              ✦ 240+ properties across India
+            </div>
           </div>
-        ) : (
-          // LOGGED OUT
-          <>
-            <Link
-              to="/login"
-              className="hide-mobile link-underline"
-              style={{
-                fontSize: 13,
-                color: theme.INK,
-                textDecoration:
-                  "none",
-              }}
-            >
-              Sign in
-            </Link>
+        </div>
 
-            <Link
-              to="/signup"
-              className="ghost-btn"
-              style={{
-                fontSize: 12,
-                padding:
-                  "10px 20px",
-                border: `1px solid ${theme.INK}`,
-                color: theme.INK,
-                textDecoration:
-                  "none",
-                letterSpacing:
-                  "0.1em",
-                textTransform:
-                  "uppercase",
-              }}
-            >
-              Join Free
-            </Link>
-          </>
+        <div className="fade-up-4" style={{ marginTop: 60 }}>
+          <SearchBar />
+        </div>
+      </section>
+
+      {/* OFFERS */}
+      <section style={{ margin: "40px 6vw", background: theme.SEA_DEEP, color: theme.CREAM, padding: "48px 56px", display: "flex", alignItems: "center", justifyContent: "space-between", position: "relative", overflow: "hidden", flexWrap: "wrap", gap: 24 }}>
+        <div style={{ position: "absolute", right: -40, top: -40, width: 200, height: 200, border: `1px solid ${theme.SEA}66`, borderRadius: "50%" }}></div>
+        <div style={{ position: "absolute", right: 60, bottom: -80, width: 280, height: 280, border: `1px solid ${theme.SEA}33`, borderRadius: "50%" }}></div>
+        <div style={{ position: "relative" }}>
+          <div style={{ fontSize: 11, letterSpacing: "0.3em", color: theme.SEA, marginBottom: 12, textTransform: "uppercase" }}>✦ Limited Offer</div>
+          <h3 className="serif" style={{ fontSize: 42, fontWeight: 400, lineHeight: 1.1, marginBottom: 12 }}>The Monsoon Edit — <em>up to 30% off</em></h3>
+          <p style={{ fontSize: 14, color: "#C8D4D1", maxWidth: 460, fontWeight: 300 }}>Twelve hand-picked retreats, reimagined for the rains. Valid for stays through September.</p>
+        </div>
+        <Link to="/hotels" className="cta-btn" style={{ background: theme.CREAM, color: theme.SEA_DEEP, padding: "16px 28px", textDecoration: "none", fontSize: 12, letterSpacing: "0.15em", textTransform: "uppercase", display: "inline-flex", alignItems: "center", gap: 10, position: "relative", fontWeight: 500 }}>
+          View Offers <ArrowUpRight size={14} />
+        </Link>
+      </section>
+
+      {/* DESTINATIONS */}
+      <section style={{ padding: "100px 6vw 80px" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 56, flexWrap: "wrap", gap: 20 }}>
+          <div>
+            <div style={{ fontSize: 11, letterSpacing: "0.3em", color: theme.SEA_DARK, marginBottom: 14, textTransform: "uppercase" }}>— 02 / Destinations</div>
+            <h2 className="serif" style={{ fontSize: "clamp(40px, 5vw, 64px)", fontWeight: 400, lineHeight: 1, letterSpacing: "-0.01em" }}>Cities <em style={{ color: theme.SEA }}>worth</em><br />wandering.</h2>
+          </div>
+          <Link to="/hotels" className="link-underline" style={{ fontSize: 13, color: theme.INK, textDecoration: "none", letterSpacing: "0.1em", paddingBottom: 8 }}>View all destinations →</Link>
+        </div>
+        {loading ? <div style={{ color: theme.MUTED }}>Loading destinations…</div> : (
+          <div className="grid-2-mobile" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 24 }}>
+            {destinations.map((d, i) => (
+              <Link key={d.name} to={`/hotels?city=${d.name}`} className="card hover-lift" style={{ textDecoration: "none", color: theme.INK, position: "relative", overflow: "hidden", display: "block", marginTop: i % 2 ? 32 : 0 }}>
+                <div style={{ width: "100%", height: 380, overflow: "hidden", position: "relative" }}>
+                  <img src={d.image} alt={d.name} className="img-zoom" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                  <div style={{ position: "absolute", inset: 0, background: `linear-gradient(180deg, transparent 50%, ${theme.INK}cc 100%)` }}></div>
+                  <div style={{ position: "absolute", bottom: 20, left: 20, right: 20, color: theme.CREAM }}>
+                    <div style={{ fontSize: 10, letterSpacing: "0.25em", opacity: 0.85, textTransform: "uppercase", marginBottom: 6 }}>{d.state}</div>
+                    <div className="serif" style={{ fontSize: 30, fontWeight: 400 }}>{d.name}</div>
+                  </div>
+                  <div style={{ position: "absolute", top: 16, right: 16, background: theme.CREAM, padding: "6px 12px", fontSize: 11, fontWeight: 500, color: theme.SEA_DARK }}>{d.count} stays</div>
+                </div>
+              </Link>
+            ))}
+          </div>
         )}
-      </div>
-    </nav>
+      </section>
+
+      {/* FEATURED */}
+      <section style={{ padding: "80px 6vw 100px", background: theme.SAND }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 56, flexWrap: "wrap", gap: 20 }}>
+          <div>
+            <div style={{ fontSize: 11, letterSpacing: "0.3em", color: theme.SEA_DARK, marginBottom: 14, textTransform: "uppercase" }}>— 03 / Featured Stays</div>
+            <h2 className="serif" style={{ fontSize: "clamp(40px, 5vw, 64px)", fontWeight: 400, lineHeight: 1, letterSpacing: "-0.01em" }}>This month's<br /><em style={{ color: theme.SEA }}>quiet favourites.</em></h2>
+          </div>
+          <Link to="/hotels" className="link-underline" style={{ fontSize: 13, color: theme.INK, textDecoration: "none", letterSpacing: "0.1em", paddingBottom: 8 }}>Browse all stays →</Link>
+        </div>
+        {error && <div style={{ color: "#a33", padding: 20 }}>Unable to load hotels: {error}. Make sure your backend is running.</div>}
+        {loading ? <div style={{ color: theme.MUTED }}>Loading featured stays…</div> : (
+          <div className="grid-1-mobile" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 32 }}>
+            {featured.slice(0, 3).map(h => <HotelCard key={h.id} hotel={h} />)}
+          </div>
+        )}
+      </section>
+
+      {/* TESTIMONIALS */}
+      <section style={{ padding: "120px 6vw", background: theme.CREAM }}>
+        <div style={{ textAlign: "center", marginBottom: 72 }}>
+          <div style={{ fontSize: 11, letterSpacing: "0.3em", color: theme.SEA_DARK, marginBottom: 14, textTransform: "uppercase" }}>— 04 / Guest Letters</div>
+          <h2 className="serif" style={{ fontSize: "clamp(40px, 5vw, 64px)", fontWeight: 400, lineHeight: 1, letterSpacing: "-0.01em" }}>Words from <em style={{ color: theme.SEA }}>those</em> who<br />stayed with us.</h2>
+        </div>
+        <div className="grid-1-mobile" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 40, maxWidth: 1200, margin: "0 auto" }}>
+          {testimonials.map((t, i) => (
+            <div key={t.name} style={{ background: "#fff", padding: 48, border: `1px solid ${theme.SAND}`, position: "relative", marginTop: i % 2 ? 40 : 0 }}>
+              <Quote size={32} color={theme.SEA} style={{ marginBottom: 20, opacity: 0.4 }} />
+              <p className="serif" style={{ fontSize: 22, lineHeight: 1.5, fontStyle: "italic", marginBottom: 32, color: theme.INK, fontWeight: 400 }}>
+                "{t.text}"
+              </p>
+              <div style={{ display: "flex", alignItems: "center", gap: 14, paddingTop: 24, borderTop: `1px solid ${theme.SAND}` }}>
+                <img src={t.img} alt="" style={{ width: 44, height: 44, borderRadius: "50%", objectFit: "cover" }} />
+                <div>
+                  <div style={{ fontSize: 14, fontWeight: 600 }}>{t.name}</div>
+                  <div style={{ fontSize: 12, color: theme.MUTED, marginTop: 2 }}>{t.role}</div>
+                </div>
+                <div style={{ marginLeft: "auto", display: "flex", gap: 2 }}>
+                  {[...Array(5)].map((_,i) => <Star key={i} size={11} fill={theme.SEA} stroke={theme.SEA} />)}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* BECOME A PARTNER */}
+      <section style={{ padding: "100px 6vw", background: theme.INK, position: "relative", overflow: "hidden" }}>
+        <div style={{ position: "absolute", right: -80, top: -80, width: 400, height: 400, border: "1px solid rgba(255,255,255,0.05)", borderRadius: "50%" }} />
+        <div style={{ position: "absolute", left: -60, bottom: -60, width: 300, height: 300, border: "1px solid rgba(255,255,255,0.05)", borderRadius: "50%" }} />
+
+        <div style={{ maxWidth: 1100, margin: "0 auto", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 80, alignItems: "center", position: "relative" }}>
+
+          {/* Left — copy */}
+          <div>
+            <div style={{ fontSize: 11, letterSpacing: "0.3em", color: theme.SEA, marginBottom: 20, textTransform: "uppercase" }}>✦ Hotel Partners</div>
+            <h2 className="serif" style={{ fontSize: "clamp(36px, 4vw, 56px)", fontWeight: 400, color: theme.CREAM, lineHeight: 1.1, marginBottom: 24 }}>
+              Own a property?<br /><em style={{ color: theme.SEA }}>List it with us.</em>
+            </h2>
+            <p style={{ fontSize: 16, color: "rgba(255,255,255,0.6)", lineHeight: 1.8, marginBottom: 40, maxWidth: 420 }}>
+              Join our curated collection of independent hotels, resorts and BnBs. We handle the bookings — you focus on the experience.
+            </p>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 14, marginBottom: 48 }}>
+              {[
+                "Get discovered by premium travellers",
+                "Manage bookings, photos & revenue in one dashboard",
+                "Direct wallet settlements with UTR tracking",
+                "Dedicated support from our team",
+              ].map(b => (
+                <div key={b} style={{ display: "flex", alignItems: "center", gap: 12, fontSize: 14, color: "rgba(255,255,255,0.75)" }}>
+                  <CheckCircle2 size={16} color={theme.SEA} style={{ flexShrink: 0 }} />
+                  {b}
+                </div>
+              ))}
+            </div>
+
+            <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
+              <Link to="/hotel-portal/signup" style={{
+                background: theme.SEA, color: theme.CREAM, padding: "16px 32px",
+                textDecoration: "none", fontSize: 13, letterSpacing: "0.15em",
+                textTransform: "uppercase", display: "inline-flex", alignItems: "center", gap: 10,
+              }}>
+                <Building2 size={16} /> Register as Partner
+              </Link>
+              <Link to="/list-property" style={{
+                background: "transparent", color: "rgba(255,255,255,0.7)",
+                border: "1px solid rgba(255,255,255,0.2)",
+                padding: "16px 32px", textDecoration: "none", fontSize: 13,
+                letterSpacing: "0.15em", textTransform: "uppercase",
+                display: "inline-flex", alignItems: "center", gap: 10,
+              }}>
+                Submit a Property <ArrowRight size={14} />
+              </Link>
+            </div>
+
+            <p style={{ fontSize: 12, color: "rgba(255,255,255,0.3)", marginTop: 16 }}>
+              Already a partner?{" "}
+              <Link to="/hotel-portal/login" style={{ color: "rgba(255,255,255,0.5)", textDecoration: "underline" }}>
+                Sign in to your portal →
+              </Link>
+            </p>
+          </div>
+
+          {/* Right — stat cards */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+            {[
+              { number: "7+", label: "Partner Hotels", sub: "and growing" },
+              { number: "₹0", label: "Setup Fee", sub: "free to list" },
+              { number: "24h", label: "Review Time", sub: "fast onboarding" },
+              { number: "100%", label: "Online Management", sub: "via partner portal" },
+            ].map(stat => (
+              <div key={stat.label} style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", padding: 28 }}>
+                <div className="serif" style={{ fontSize: 36, color: theme.CREAM, fontWeight: 400, lineHeight: 1 }}>{stat.number}</div>
+                <div style={{ fontSize: 13, color: theme.SEA, marginTop: 8, fontWeight: 600 }}>{stat.label}</div>
+                <div style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", marginTop: 4 }}>{stat.sub}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+    </main>
   );
 }
