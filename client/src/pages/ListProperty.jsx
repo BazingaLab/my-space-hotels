@@ -3,7 +3,8 @@ import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext.jsx";
 import { pendingApi } from "../lib/api.js";
 import { theme } from "../lib/theme.js";
-import { ArrowRight, ArrowLeft, Check, Building2, FileText, ImageIcon, Eye } from "lucide-react";
+import { ArrowRight, ArrowLeft, Check, Building2, FileText, ImageIcon, Eye, Upload } from "lucide-react";
+import { supabase } from "../lib/supabase.js";
 
 const TAGS = ["Heritage", "Beachfront", "Luxury", "Boutique", "Mountain", "City"];
 const AMENITIES = ["WiFi", "Pool", "Spa", "Restaurant", "Bar", "Parking", "Gym", "Beach Access", "Room Service", "Laundry", "Airport Transfer", "Pet Friendly", "Fireplace", "Garden", "Rooftop", "Yoga Deck", "Bicycles", "Library", "Trekking", "Boat Tours"];
@@ -18,6 +19,8 @@ export default function ListProperty() {
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState(null);
+  const [uploading, setUploading] = useState({ cover: false, extra: false });
+  const [isDragging, setIsDragging] = useState({ cover: false, extra: false });
 
   const steps = [
     { n: 1, label: "Basic Info", icon: Building2 },
@@ -30,6 +33,37 @@ export default function ListProperty() {
     setForm(f => ({
       ...f,
       amenities: f.amenities.includes(a) ? f.amenities.filter(x => x !== a) : [...f.amenities, a],
+    }));
+  };
+
+  // Upload an image to Supabase Storage and return its public URL
+  const uploadImage = async (file, slot) => {
+    if (!file) return null;
+    if (!file.type.startsWith("image/")) { setError("Only image files allowed."); return null; }
+    if (file.size > 5 * 1024 * 1024) { setError("Max file size is 5MB."); return null; }
+    setUploading(u => ({ ...u, [slot]: true })); setError(null);
+    try {
+      const ext = file.name.split(".").pop();
+      const path = `public/list-property/${Date.now()}-${Math.random().toString(36).slice(-4)}.${ext}`;
+      const { error: upErr } = await supabase.storage.from("hotel-photos").upload(path, file, { cacheControl: "3600", upsert: false });
+      if (upErr) throw upErr;
+      const { data: { publicUrl } } = supabase.storage.from("hotel-photos").getPublicUrl(path);
+      return publicUrl;
+    } catch (e) { setError(`Upload failed: ${e.message}`); return null; }
+    finally { setUploading(u => ({ ...u, [slot]: false })); }
+  };
+
+  const handleCoverUpload = async (file) => {
+    const url = await uploadImage(file, "cover");
+    if (url) setForm(f => ({ ...f, cover_image: url }));
+  };
+
+  const handleExtraUpload = async (files) => {
+    const uploads = await Promise.all(Array.from(files).map(f => uploadImage(f, "extra")));
+    const urls = uploads.filter(Boolean);
+    if (urls.length) setForm(f => ({
+      ...f,
+      images: f.images ? f.images + ", " + urls.join(", ") : urls.join(", "),
     }));
   };
 
@@ -202,16 +236,59 @@ export default function ListProperty() {
               <div style={{ fontSize: 12, color: theme.MUTED, marginTop: 6 }}>This is the base price. You can adjust it later from your dashboard.</div>
             </div>
             <div>
-              <label style={lbl}>Cover Image URL *</label>
-              <input required style={inp} placeholder="https://images.unsplash.com/..." value={form.cover_image} onChange={e => setForm({ ...form, cover_image: e.target.value })} />
-              {form.cover_image && (
-                <img src={form.cover_image} alt="" style={{ width: "100%", height: 200, objectFit: "cover", marginTop: 12, borderRadius: 2 }} onError={e => e.target.style.display = "none"} />
-              )}
+              <label style={lbl}>Cover Image *</label>
+              <div
+                onClick={() => document.getElementById("lp_cover").click()}
+                onDragEnter={e => { e.preventDefault(); setIsDragging(d => ({ ...d, cover: true })); }}
+                onDragOver={e => { e.preventDefault(); setIsDragging(d => ({ ...d, cover: true })); }}
+                onDragLeave={e => { e.preventDefault(); if (e.currentTarget.contains(e.relatedTarget)) return; setIsDragging(d => ({ ...d, cover: false })); }}
+                onDrop={e => { e.preventDefault(); setIsDragging(d => ({ ...d, cover: false })); handleCoverUpload(e.dataTransfer.files?.[0]); }}
+                style={{ border: `2px dashed ${isDragging.cover ? theme.SEA : theme.SAND}`, background: isDragging.cover ? `${theme.SEA}10` : "#fff", padding: 24, cursor: "pointer", transition: "all 0.15s", display: "flex", alignItems: "center", gap: 16, justifyContent: form.cover_image ? "flex-start" : "center" }}
+              >
+                <input id="lp_cover" type="file" accept="image/*" style={{ display: "none" }} onChange={e => handleCoverUpload(e.target.files?.[0])} />
+                {form.cover_image ? (
+                  <img src={form.cover_image} alt="cover" style={{ width: 100, height: 68, objectFit: "cover", border: `1px solid ${theme.SAND}` }} onError={e => e.target.style.display = "none"} />
+                ) : (
+                  <div style={{ width: 52, height: 52, borderRadius: "50%", background: `${theme.SEA}15`, display: "grid", placeItems: "center" }}>
+                    {uploading.cover ? <div style={{ width: 22, height: 22, border: `2px solid ${theme.SEA}`, borderTopColor: "transparent", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} /> : <Upload size={22} color={theme.SEA} />}
+                  </div>
+                )}
+                <div>
+                  <div style={{ fontSize: 14, fontWeight: 500, color: isDragging.cover ? theme.SEA_DARK : theme.INK }}>
+                    {uploading.cover ? "Uploading…" : isDragging.cover ? "Drop image here" : form.cover_image ? "Click to replace cover image" : "Click or drag & drop cover image"}
+                  </div>
+                  <div style={{ fontSize: 12, color: theme.MUTED, marginTop: 2 }}>JPG, PNG, WebP · Max 5MB</div>
+                </div>
+              </div>
+              <input style={{ ...inp, marginTop: 10 }} placeholder="…or paste an image URL" value={form.cover_image} onChange={e => setForm({ ...form, cover_image: e.target.value })} />
             </div>
             <div>
-              <label style={lbl}>Additional Images (comma separated URLs)</label>
-              <textarea style={{ ...inp, minHeight: 100, resize: "vertical" }} placeholder="https://..., https://..., https://..." value={form.images} onChange={e => setForm({ ...form, images: e.target.value })} />
-              <div style={{ fontSize: 12, color: theme.MUTED, marginTop: 6 }}>Paste Unsplash or direct image URLs separated by commas.</div>
+              <label style={lbl}>Additional Images</label>
+              <div
+                onClick={() => document.getElementById("lp_extra").click()}
+                onDragEnter={e => { e.preventDefault(); setIsDragging(d => ({ ...d, extra: true })); }}
+                onDragOver={e => { e.preventDefault(); setIsDragging(d => ({ ...d, extra: true })); }}
+                onDragLeave={e => { e.preventDefault(); if (e.currentTarget.contains(e.relatedTarget)) return; setIsDragging(d => ({ ...d, extra: false })); }}
+                onDrop={e => { e.preventDefault(); setIsDragging(d => ({ ...d, extra: false })); handleExtraUpload(e.dataTransfer.files); }}
+                style={{ border: `2px dashed ${isDragging.extra ? theme.SEA : theme.SAND}`, background: isDragging.extra ? `${theme.SEA}10` : "#fff", padding: 24, cursor: "pointer", transition: "all 0.15s", textAlign: "center" }}
+              >
+                <input id="lp_extra" type="file" accept="image/*" multiple style={{ display: "none" }} onChange={e => handleExtraUpload(e.target.files)} />
+                <div style={{ width: 48, height: 48, borderRadius: "50%", background: `${theme.SEA}15`, display: "grid", placeItems: "center", margin: "0 auto 12px" }}>
+                  {uploading.extra ? <div style={{ width: 20, height: 20, border: `2px solid ${theme.SEA}`, borderTopColor: "transparent", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} /> : <Upload size={20} color={theme.SEA} />}
+                </div>
+                <div style={{ fontSize: 14, fontWeight: 500, color: isDragging.extra ? theme.SEA_DARK : theme.INK }}>
+                  {uploading.extra ? "Uploading…" : isDragging.extra ? "Drop images here" : "Click or drag & drop additional images"}
+                </div>
+                <div style={{ fontSize: 12, color: theme.MUTED, marginTop: 4 }}>Select multiple files · JPG, PNG, WebP · Max 5MB each</div>
+              </div>
+              {form.images && (
+                <div style={{ marginTop: 10, display: "flex", flexWrap: "wrap", gap: 8 }}>
+                  {form.images.split(",").map((url, i) => url.trim() && (
+                    <img key={i} src={url.trim()} alt="" style={{ width: 80, height: 56, objectFit: "cover", border: `1px solid ${theme.SAND}` }} onError={e => e.target.style.display = "none"} />
+                  ))}
+                </div>
+              )}
+              <textarea style={{ ...inp, minHeight: 60, resize: "vertical", marginTop: 10 }} placeholder="…or paste image URLs separated by commas" value={form.images} onChange={e => setForm({ ...form, images: e.target.value })} />
             </div>
           </div>
         )}
@@ -292,6 +369,7 @@ export default function ListProperty() {
         </div>
         {error && step < 4 && <div style={{ color: "#a33", fontSize: 13, marginTop: 12 }}>{error}</div>}
       </div>
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </main>
   );
 }
