@@ -6,12 +6,6 @@ import bookingRoutes from "./routes/bookingRoutes.js";
 import adminRoutes from "./routes/adminRoutes.js";
 import pendingRoutes from "./routes/pendingRoutes.js";
 import complaintsRoutes from "./routes/complaintsRoutes.js";
-import customerRoutes from "./routes/customerRoutes.js";
-import walletRoutes from "./routes/walletRoutes.js";
-import bookingMgmtRoutes from "./routes/bookingMgmtRoutes.js";
-import teamRoutes from "./routes/teamRoutes.js";
-import guestBookingRoutes from "./routes/guestBookingRoutes.js";
-import reviewRoutes from "./routes/reviewRoutes.js";
 
 dotenv.config();
 
@@ -32,12 +26,6 @@ app.use("/api/bookings", bookingRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/pending", pendingRoutes);
 app.use("/api/complaints", complaintsRoutes);
-app.use("/api/customers", customerRoutes);
-app.use("/api/wallets", walletRoutes);
-app.use("/api/booking-mgmt", bookingMgmtRoutes);
-app.use("/api/team", teamRoutes);
-app.use("/api/guest-bookings", guestBookingRoutes);
-app.use("/api/reviews", reviewRoutes);
 
 app.use((req, res) => res.status(404).json({ message: "Route not found" }));
 app.use((err, req, res, next) => {

@@ -61,6 +61,8 @@ import PhotoManager from "./pages/hotel-portal/PhotoManager.jsx";
 import BookingsManager from "./pages/hotel-portal/BookingsManager.jsx";
 import WalletView from "./pages/hotel-portal/WalletView.jsx";
 import AddProperty from "./pages/hotel-portal/AddProperty.jsx";
+import KYCUpload from "./pages/hotel-portal/KYCUpload.jsx";
+import AdminKYC from "./pages/admin/AdminKYC.jsx";
 
 /* =========================
    INNER ROUTES
@@ -266,6 +268,15 @@ function AppRoutes() {
         />
 
         <Route
+          path="/admin/kyc"
+          element={
+            <ProtectedRoute requireAdmin>
+              <AdminKYC />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
           path="/admin/pending"
           element={
             <ProtectedRoute requireAdmin>
@@ -333,6 +344,15 @@ function AppRoutes() {
           element={
             <ProtectedRoute requireHotelAdmin>
               <AddProperty />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/hotel-portal/kyc"
+          element={
+            <ProtectedRoute requireHotelAdmin>
+              <KYCUpload />
             </ProtectedRoute>
           }
         />

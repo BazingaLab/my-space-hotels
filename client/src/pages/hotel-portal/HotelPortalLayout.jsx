@@ -2,7 +2,7 @@ import { Link, useLocation, useNavigate, Navigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext.jsx";
 import { useHotelPortal } from "../../context/HotelPortalContext.jsx";
 import { theme } from "../../lib/theme.js";
-import { LayoutDashboard, Building2, Image, CalendarCheck, Wallet, LogOut, Sparkles, ChevronRight, ExternalLink, PlusCircle, Check } from "lucide-react";
+import { LayoutDashboard, Building2, Image, CalendarCheck, Wallet, LogOut, Sparkles, ChevronRight, ExternalLink, PlusCircle, Check, ShieldCheck } from "lucide-react";
 
 const navItems = [
   { path: "/hotel-portal", label: "Dashboard", icon: LayoutDashboard },
@@ -10,6 +10,7 @@ const navItems = [
   { path: "/hotel-portal/photos", label: "Photo Manager", icon: Image },
   { path: "/hotel-portal/bookings", label: "Bookings", icon: CalendarCheck },
   { path: "/hotel-portal/wallet", label: "Wallet", icon: Wallet },
+  { path: "/hotel-portal/kyc", label: "KYC Documents", icon: ShieldCheck },
 ];
 
 export default function HotelPortalLayout({ children }) {
