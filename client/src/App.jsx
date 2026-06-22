@@ -58,6 +58,7 @@ import PropertyManager from "./pages/hotel-portal/PropertyManager.jsx";
 import PhotoManager from "./pages/hotel-portal/PhotoManager.jsx";
 import BookingsManager from "./pages/hotel-portal/BookingsManager.jsx";
 import WalletView from "./pages/hotel-portal/WalletView.jsx";
+import AddProperty from "./pages/hotel-portal/AddProperty.jsx";
 
 /* =========================
    INNER ROUTES
@@ -314,6 +315,15 @@ function AppRoutes() {
           element={
             <ProtectedRoute requireHotelAdmin>
               <WalletView />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/hotel-portal/add-property"
+          element={
+            <ProtectedRoute requireHotelAdmin>
+              <AddProperty />
             </ProtectedRoute>
           }
         />
