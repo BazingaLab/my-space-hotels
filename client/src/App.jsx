@@ -53,6 +53,7 @@ import AdminTeam from "./pages/admin/AdminTeam.jsx";
 ========================= */
 
 import HotelPortalLogin from "./pages/hotel-portal/HotelPortalLogin.jsx";
+import HotelPortalSignup from "./pages/hotel-portal/HotelPortalSignup.jsx";
 import HotelPortalDashboard from "./pages/hotel-portal/HotelPortalDashboard.jsx";
 import PropertyManager from "./pages/hotel-portal/PropertyManager.jsx";
 import PhotoManager from "./pages/hotel-portal/PhotoManager.jsx";
@@ -280,6 +281,13 @@ function AppRoutes() {
           path="/hotel-portal/login"
           element={
             <HotelPortalLogin />
+          }
+        />
+
+        <Route
+          path="/hotel-portal/signup"
+          element={
+            <HotelPortalSignup />
           }
         />
 

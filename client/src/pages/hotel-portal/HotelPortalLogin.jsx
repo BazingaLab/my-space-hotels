@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext.jsx";
 import { theme } from "../../lib/theme.js";
-import { Building2, Mail, Lock, ArrowRight } from "lucide-react";
+import { Building2, Mail, Lock, ArrowRight, Eye, EyeOff } from "lucide-react";
 
 export default function HotelPortalLogin() {
   const { signIn, signOut } = useAuth();
@@ -10,6 +10,7 @@ export default function HotelPortalLogin() {
   const [form, setForm] = useState({ email: "", password: "" });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [showPassword, setShowPassword] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -104,8 +105,8 @@ export default function HotelPortalLogin() {
 
         {/* FOOTER */}
         <div style={{ position: "relative", fontSize: 13, color: "rgba(255,255,255,0.4)" }}>
-          Want to list your property?{" "}
-          <Link to="/list-property" style={{ color: "rgba(255,255,255,0.7)", textDecoration: "none" }}>Apply here →</Link>
+          New partner?{" "}
+          <Link to="/hotel-portal/signup" style={{ color: "rgba(255,255,255,0.7)", textDecoration: "none" }}>Create an account →</Link>
         </div>
       </div>
 
@@ -141,7 +142,10 @@ export default function HotelPortalLogin() {
               <label style={{ fontSize: 11, letterSpacing: "0.2em", color: theme.SEA_DARK, textTransform: "uppercase", marginBottom: 8, display: "block", fontWeight: 600 }}>Password</label>
               <div style={{ position: "relative" }}>
                 <Lock size={16} color={theme.MUTED} style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)" }} />
-                <input required type="password" style={inp} placeholder="••••••••" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
+                <input required type={showPassword ? "text" : "password"} style={{ ...inp, paddingRight: 44 }} placeholder="••••••••" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
+                <button type="button" onClick={() => setShowPassword(s => !s)} style={{ position: "absolute", right: 14, top: "50%", transform: "translateY(-50%)", background: "transparent", border: "none", cursor: "pointer", color: theme.MUTED, display: "flex", alignItems: "center" }}>
+                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
               </div>
             </div>
 
@@ -166,8 +170,8 @@ export default function HotelPortalLogin() {
           {/* INFO BOX */}
           <div style={{ marginTop: 28, padding: 20, background: theme.SAND, fontSize: 13, color: theme.MUTED, lineHeight: 1.6 }}>
             <strong style={{ color: theme.INK }}>Not a partner yet?</strong>{" "}
-            Submit your property for review and we'll get back to you within 48 hours.{" "}
-            <Link to="/list-property" style={{ color: theme.SEA_DARK, fontWeight: 600 }}>List your property →</Link>
+            Create your hotel partner account and list your property in minutes.{" "}
+            <Link to="/hotel-portal/signup" style={{ color: theme.SEA_DARK, fontWeight: 600 }}>Sign up here →</Link>
           </div>
         </div>
       </div>
