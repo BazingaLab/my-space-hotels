@@ -7,8 +7,9 @@ import { pendingApi } from "../../lib/api.js";
 import { theme } from "../../lib/theme.js";
 import { Building2, Send, CheckCircle2, Upload, Image as ImageIcon } from "lucide-react";
 import { supabase } from "../../lib/supabase.js";
+import AddressInput from "../../shared/components/AddressInput.jsx";
 
-const TAGS = ["Heritage", "Beachfront", "Luxury", "Boutique", "Mountain", "City"];
+const TAGS = ["Heritage", "Beachfront", "Boutique", "Hotel", "Resort", "BnB"];
 
 export default function AddProperty() {
   const { user } = useAuth();
@@ -152,10 +153,13 @@ export default function AddProperty() {
 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
             <div><label style={lbl}>Contact Number</label><input style={inp} value={form.contact_number} onChange={e => set("contact_number", e.target.value)} /></div>
-            <div><label style={lbl}>Pincode</label><input style={inp} value={form.pincode} onChange={e => set("pincode", e.target.value)} /></div>
           </div>
 
-          <div><label style={lbl}>Property Address</label><input style={inp} value={form.property_address} onChange={e => set("property_address", e.target.value)} /></div>
+          <AddressInput
+            required
+            value={{ building: form.building, street: form.street, landmark: form.landmark, pincode: form.pincode, post_office: form.post_office, city: form.city, district: form.district, state: form.state }}
+            onChange={addr => setForm(f => ({ ...f, ...addr }))}
+          />
           <div><label style={lbl}>Google Maps Link</label><input style={inp} value={form.google_map_link} onChange={e => set("google_map_link", e.target.value)} /></div>
 
           {error && <div style={{ color: "#a33", fontSize: 13, padding: 12, background: "#fff5f5", border: "1px solid #fcc" }}>{error}</div>}

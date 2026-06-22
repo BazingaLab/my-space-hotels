@@ -4,9 +4,10 @@ import { adminApi } from "../../lib/api.js";
 import { useAuth } from "../../context/AuthContext.jsx";
 import { supabase } from "../../lib/supabase.js";
 import { Save, Building2, User, FileText, MapPin, Clock, IndianRupee, Landmark, Upload, Image as ImageIcon } from "lucide-react";
+import AddressInput from "../../shared/components/AddressInput.jsx";
 
 const HOTEL_TYPES = ["Budget", "Premium", "Resort"];
-const TAGS = ["Heritage", "Beachfront", "Luxury", "Boutique", "Mountain", "City"];
+const TAGS = ["Heritage", "Beachfront", "Boutique", "Hotel", "Resort", "BnB"];
 const AMENITIES = ["WiFi", "AC", "Parking", "Pool", "Spa", "Restaurant", "Bar", "Gym", "Room Service", "Laundry", "Airport Transfer", "Power Backup", "CCTV", "Elevator"];
 
 const empty = {
@@ -17,6 +18,7 @@ const empty = {
   agreement_start_date: "", agreement_end_date: "", commission_percent: 0,
   bank_account_name: "", bank_account_number: "", bank_ifsc: "", bank_name: "",
   referred_by_name: "",
+  building: "", street: "", landmark: "", district: "", post_office: "",
 };
 
 export default function HotelOnboardingForm({ initial = null, onSaved }) {
@@ -57,6 +59,8 @@ export default function HotelOnboardingForm({ initial = null, onSaved }) {
         name: f.name, hotel_type: f.hotel_type, owner_name: f.owner_name, contact_number: f.contact_number,
         owner_email: f.owner_email, gst_number: f.gst_number, pan_number: f.pan_number,
         property_address: f.property_address, city: f.city, state: f.state, pincode: f.pincode,
+        building: f.building, street: f.street, landmark: f.landmark,
+        district: f.district, post_office: f.post_office,
         google_map_link: f.google_map_link, description: f.description, short_description: f.short_description,
         checkin_time: f.checkin_time || null, checkout_time: f.checkout_time || null,
         amenities: f.amenities, rooms: Number(f.rooms), price: Number(f.price), tag: f.tag,
@@ -168,12 +172,11 @@ export default function HotelOnboardingForm({ initial = null, onSaved }) {
       </Section>
 
       <Section icon={MapPin} title="Location">
-        <div style={{ marginBottom: 16 }}><Field label="Property Address" k="property_address" req /></div>
-        <div style={grid3}>
-          <Field label="City" k="city" req />
-          <Field label="State" k="state" req />
-          <Field label="Pincode" k="pincode" />
-        </div>
+        <AddressInput
+          required
+          value={{ building: f.building, street: f.street, landmark: f.landmark, pincode: f.pincode, post_office: f.post_office, city: f.city, district: f.district, state: f.state }}
+          onChange={addr => setF(s => ({ ...s, ...addr }))}
+        />
         <div style={{ marginTop: 16 }}><Field label="Google Map Link" k="google_map_link" ph="https://maps.google.com/..." /></div>
       </Section>
 

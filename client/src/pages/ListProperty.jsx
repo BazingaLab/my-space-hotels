@@ -5,11 +5,12 @@ import { pendingApi } from "../lib/api.js";
 import { theme } from "../lib/theme.js";
 import { ArrowRight, ArrowLeft, Check, Building2, FileText, ImageIcon, Eye, Upload } from "lucide-react";
 import { supabase } from "../lib/supabase.js";
+import AddressInput from "../shared/components/AddressInput.jsx";
 
-const TAGS = ["Heritage", "Beachfront", "Luxury", "Boutique", "Mountain", "City"];
+const TAGS = ["Heritage", "Beachfront", "Boutique", "Hotel", "Resort", "BnB"];
 const AMENITIES = ["WiFi", "Pool", "Spa", "Restaurant", "Bar", "Parking", "Gym", "Beach Access", "Room Service", "Laundry", "Airport Transfer", "Pet Friendly", "Fireplace", "Garden", "Rooftop", "Yoga Deck", "Bicycles", "Library", "Trekking", "Boat Tours"];
 
-const empty = { name: "", city: "", state: "", tag: "Boutique", description: "", short_description: "", amenities: [], rooms: 1, price: "", cover_image: "", images: "" };
+const empty = { name: "", city: "", state: "", district: "", pincode: "", building: "", street: "", landmark: "", post_office: "", tag: "Boutique", description: "", short_description: "", amenities: [], rooms: 1, price: "", cover_image: "", images: "" };
 
 export default function ListProperty() {
   const { user } = useAuth();
@@ -167,16 +168,11 @@ export default function ListProperty() {
               <label style={lbl}>Property Name *</label>
               <input required style={inp} placeholder="e.g. The Lake House" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-              <div>
-                <label style={lbl}>City *</label>
-                <input required style={inp} placeholder="e.g. Udaipur" value={form.city} onChange={e => setForm({ ...form, city: e.target.value })} />
-              </div>
-              <div>
-                <label style={lbl}>State *</label>
-                <input required style={inp} placeholder="e.g. Rajasthan" value={form.state} onChange={e => setForm({ ...form, state: e.target.value })} />
-              </div>
-            </div>
+            <AddressInput
+              required
+              value={{ building: form.building, street: form.street, landmark: form.landmark, pincode: form.pincode, post_office: form.post_office, city: form.city, district: form.district, state: form.state }}
+              onChange={addr => setForm(f => ({ ...f, ...addr }))}
+            />
             <div>
               <label style={lbl}>Property Type</label>
               <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
