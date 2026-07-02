@@ -1,8 +1,10 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
+// 1. Imported your exact logo file from the assets folder
+import logoImg from "../assets/my_space_hotels_logo.png";
+
 import {
-  Sparkles,
   User,
   LogOut,
   ChevronDown,
@@ -65,55 +67,26 @@ export default function Navbar() {
         zIndex: 100,
       }}
     >
-      {/* LOGO */}
+      {/* =========================
+          UPDATED LOGO SECTION
+      ========================= */}
       <Link
         to="/"
         style={{
           display: "flex",
           alignItems: "center",
-          gap: 10,
           textDecoration: "none",
-          color: theme.INK,
         }}
       >
-        <div
-          style={{
-            width: 36,
-            height: 36,
-            borderRadius: "50%",
-            background: theme.SEA,
-            display: "grid",
-            placeItems: "center",
-            color: theme.CREAM,
-          }}
-        >
-          <Sparkles size={16} />
-        </div>
-
-        <div>
-          <div
-            className="serif"
-            style={{
-              fontSize: 22,
-              fontWeight: 500,
-              lineHeight: 1,
-              letterSpacing: "0.5px",
-            }}
-          >
-            My Space
-          </div>
-
-          <div
-            style={{
-              fontSize: 9,
-              letterSpacing: "0.3em",
-              color: theme.SEA_DARK,
-              marginTop: 2,
-            }}
-          >
-            HOTELS
-          </div>
-        </div>
+        <img 
+          src={logoImg} 
+          alt="My Space Hotels Logo" 
+          style={{ 
+            height: "40px", // Adjusts the vertical size cleanly within your 28px padding layout
+            width: "auto",
+            objectFit: "contain"
+          }} 
+        />
       </Link>
 
       {/* MAIN NAV */}
