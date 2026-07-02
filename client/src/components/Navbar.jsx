@@ -59,7 +59,7 @@ export default function Navbar() {
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
-        padding: "28px 6vw",
+        padding: "24px 6vw", // Slipped the vertical padding down slightly to accommodate the taller layout perfectly
         borderBottom: `1px solid ${theme.SAND}`,
         background: theme.CREAM,
         position: "sticky",
@@ -68,25 +68,52 @@ export default function Navbar() {
       }}
     >
       {/* =========================
-          UPDATED LOGO SECTION
+          UPDATED LOGO & TEXT SECTION
       ========================= */}
       <Link
         to="/"
         style={{
           display: "flex",
           alignItems: "center",
+          gap: 12, // Keeps a clean distance between the image and text
           textDecoration: "none",
+          color: theme.INK,
         }}
       >
         <img 
           src={logoImg} 
           alt="My Space Hotels Logo" 
           style={{ 
-            height: "80px", // Adjusts the vertical size cleanly within your 28px padding layout
+            height: "80px", // Perfect size to align with a two-line text title
             width: "auto",
             objectFit: "contain"
           }} 
         />
+
+        <div>
+          <div
+            className="serif"
+            style={{
+              fontSize: 22,
+              fontWeight: 500,
+              lineHeight: 1,
+              letterSpacing: "0.5px",
+            }}
+          >
+            My Space
+          </div>
+
+          <div
+            style={{
+              fontSize: 9,
+              letterSpacing: "0.3em",
+              color: theme.SEA_DARK,
+              marginTop: 4,
+            }}
+          >
+            HOTELS
+          </div>
+        </div>
       </Link>
 
       {/* MAIN NAV */}
@@ -279,11 +306,11 @@ export default function Navbar() {
                             "0.1em",
                           textTransform:
                             "uppercase",
-                        }}
-                      >
-                        Hotel Admin
-                      </div>
-                    )}
+                      }}
+                    >
+                      Hotel Admin
+                    </div>
+                  )}
                 </div>
 
                 {/* MY BOOKINGS */}
