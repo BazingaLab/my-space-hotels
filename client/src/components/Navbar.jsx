@@ -82,7 +82,7 @@ export default function Navbar() {
           src={logoImg} 
           alt="My Space Hotels Logo" 
           style={{ 
-            height: "40px", // Adjusts the vertical size cleanly within your 28px padding layout
+            height: "80px", // Adjusts the vertical size cleanly within your 28px padding layout
             width: "auto",
             objectFit: "contain"
           }} 
