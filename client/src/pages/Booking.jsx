@@ -2,8 +2,19 @@ import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { Check, ArrowRight } from "lucide-react";
 import { theme } from "../lib/theme.js";
-import { api } from "../lib/api.js";
+import { api, paymentsApi } from "../lib/api.js";
 import { useAuth } from "../context/AuthContext.jsx";
+
+function loadRazorpayScript() {
+  if (window.Razorpay) return Promise.resolve(true);
+  return new Promise((resolve) => {
+    const script = document.querySelector('script[src*="checkout.razorpay.com"]');
+    if (!script) return resolve(false);
+    if (window.Razorpay) return resolve(true);
+    script.addEventListener("load", () => resolve(true));
+    script.addEventListener("error", () => resolve(false));
+  });
+}
 
 export default function Booking() {
   const { id } = useParams();
@@ -13,6 +24,7 @@ export default function Booking() {
     guest_name: "", guest_email: "", guest_phone: "",
     check_in: "", check_out: "", guests: 2,
   });
+  const [paymentMode, setPaymentMode] = useState("pay_at_hotel");
   const [submitting, setSubmitting] = useState(false);
   const [confirmed, setConfirmed] = useState(null);
   const [error, setError] = useState(null);
@@ -42,11 +54,61 @@ export default function Booking() {
     setError(null);
     setSubmitting(true);
     try {
-      const res = await api.createBooking({ hotel_id: id, ...form, guests: Number(form.guests), user_id: user?.id || null });
-      setConfirmed(res.booking);
+      if (paymentMode === "pay_at_hotel") {
+        const res = await api.createBooking({ hotel_id: id, ...form, guests: Number(form.guests), user_id: user?.id || null });
+        setConfirmed(res.booking);
+        setSubmitting(false);
+        return;
+      }
+
+      // Prepaid: create a Razorpay order first, then open Checkout.
+      const order = await paymentsApi.createOrder({ hotel_id: id, ...form, guests: Number(form.guests), user_id: user?.id || null });
+
+      const scriptReady = await loadRazorpayScript();
+      if (!scriptReady || !window.Razorpay) {
+        setError("Couldn't load the payment window. Please check your connection and try again.");
+        setSubmitting(false);
+        return;
+      }
+
+      const rzp = new window.Razorpay({
+        key: order.key_id,
+        order_id: order.order_id,
+        amount: order.amount,
+        currency: order.currency,
+        name: "My Space Hotels",
+        description: hotel.name,
+        prefill: { name: form.guest_name, email: form.guest_email, contact: form.guest_phone },
+        theme: { color: theme.SEA },
+        handler: async (response) => {
+          try {
+            const verifyRes = await paymentsApi.verify({
+              booking_id: order.booking_id,
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_signature: response.razorpay_signature,
+            });
+            setConfirmed(verifyRes.booking);
+          } catch (err) {
+            setError("Payment succeeded but confirmation failed — contact support with your payment ID: " + response.razorpay_payment_id);
+          } finally {
+            setSubmitting(false);
+          }
+        },
+        modal: {
+          ondismiss: () => {
+            // User closed the Checkout modal without paying — not an error.
+            setSubmitting(false);
+          },
+        },
+      });
+      rzp.on("payment.failed", () => {
+        setError("Payment failed. You can try again, or choose Pay at Hotel instead.");
+        setSubmitting(false);
+      });
+      rzp.open();
     } catch (err) {
       setError(err.message);
-    } finally {
       setSubmitting(false);
     }
   };
@@ -138,6 +200,31 @@ export default function Booking() {
             </div>
           </div>
 
+          <div>
+            <label style={labelStyle}>Payment</label>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+              {[
+                { value: "pay_at_hotel", label: "Pay at Hotel", hint: "Settle when you check in" },
+                { value: "prepaid", label: "Pay Now", hint: "Secure online payment" },
+              ].map(opt => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => setPaymentMode(opt.value)}
+                  style={{
+                    textAlign: "left", padding: "14px 16px", cursor: "pointer",
+                    border: `1px solid ${paymentMode === opt.value ? theme.SEA : theme.SAND}`,
+                    background: paymentMode === opt.value ? "#fff" : "transparent",
+                    boxShadow: paymentMode === opt.value ? `inset 0 0 0 1px ${theme.SEA}` : "none",
+                  }}
+                >
+                  <div style={{ fontSize: 14, fontWeight: 600, color: paymentMode === opt.value ? theme.SEA_DARK : theme.INK }}>{opt.label}</div>
+                  <div style={{ fontSize: 12, color: theme.MUTED, marginTop: 2 }}>{opt.hint}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+
           {error && <div style={{ color: "#a33", padding: 14, background: "#fff5f5", border: "1px solid #fcc" }}>{error}</div>}
 
           <button type="submit" disabled={submitting} className="cta-btn" style={{
@@ -146,7 +233,9 @@ export default function Booking() {
             display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
             opacity: submitting ? 0.6 : 1,
           }}>
-            {submitting ? "Confirming…" : <>Confirm Reservation <ArrowRight size={14} /></>}
+            {submitting
+              ? (paymentMode === "prepaid" ? "Opening payment…" : "Confirming…")
+              : <>{paymentMode === "prepaid" ? "Proceed to Payment" : "Confirm Reservation"} <ArrowRight size={14} /></>}
           </button>
         </form>
 

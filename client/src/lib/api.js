@@ -102,6 +102,11 @@ export const guestBookingApi = {
   cancel: (id, user_id) => request(`/api/guest-bookings/${id}/cancel`, { method: "POST", body: JSON.stringify({ user_id }) }),
 };
 
+export const paymentsApi = {
+  createOrder: (data) => request("/api/payments/create-order", { method: "POST", body: JSON.stringify(data) }),
+  verify: (data) => request("/api/payments/verify", { method: "POST", body: JSON.stringify(data) }),
+};
+
 export const reviewApi = {
   create: (data) => request("/api/reviews", { method: "POST", body: JSON.stringify(data) }),
   byHotel: (hotelId) => request(`/api/reviews/hotel/${hotelId}`),

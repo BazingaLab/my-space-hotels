@@ -6,6 +6,7 @@ import bookingRoutes from "./routes/bookingRoutes.js";
 import adminRoutes from "./routes/adminRoutes.js";
 import pendingRoutes from "./routes/pendingRoutes.js";
 import complaintsRoutes from "./routes/complaintsRoutes.js";
+import paymentRoutes, { webhook as razorpayWebhook } from "./routes/paymentRoutes.js";
 
 dotenv.config();
 
@@ -15,6 +16,12 @@ app.use(cors({
   origin: process.env.CLIENT_URL?.split(",") || "*",
   credentials: true,
 }));
+
+// Razorpay webhook MUST be mounted with express.raw() and BEFORE
+// express.json() below — its signature is computed over the exact raw
+// request bytes, which express.json() would otherwise consume/reparse.
+app.post("/api/payments/webhook", express.raw({ type: "application/json" }), razorpayWebhook);
+
 app.use(express.json());
 
 app.get("/", (req, res) => {
@@ -26,6 +33,7 @@ app.use("/api/bookings", bookingRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/pending", pendingRoutes);
 app.use("/api/complaints", complaintsRoutes);
+app.use("/api/payments", paymentRoutes);
 
 app.use((req, res) => res.status(404).json({ message: "Route not found" }));
 app.use((err, req, res, next) => {

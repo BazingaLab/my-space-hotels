@@ -1,8 +1,8 @@
-# My Space Hotels ✦
+# My Space Hotels 
 
 A premium hotel aggregator built with **React + Vite** (frontend), **Node + Express** (backend), and **Supabase** (PostgreSQL database). Deployed on **Vercel**.
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 my-space-hotels/
@@ -24,7 +24,7 @@ my-space-hotels/
 
 ---
 
-## 🚀 Setup (One-Time, ~15 minutes)
+## Setup (One-Time, ~15 minutes)
 
 ### Step 1: Set up Supabase
 
@@ -38,7 +38,7 @@ my-space-hotels/
    - **Project URL** (looks like `https://xxxxx.supabase.co`)
    - **service_role key** (under "Project API keys" — click reveal, then copy)
 
-⚠️ **Never commit the service_role key to GitHub** — it bypasses Row Level Security.
+**Never commit the service_role key to GitHub** — it bypasses Row Level Security.
 
 ### Step 2: Install backend
 
@@ -136,13 +136,13 @@ Go back to your backend project on Vercel → **Settings → Environment Variabl
 
 ---
 
-## 🔁 Continuous Deployment
+## Continuous Deployment
 
 From now on, every `git push` to main auto-deploys both projects. No manual work.
 
 ---
 
-## 📡 API Endpoints
+## API Endpoints
 
 | Method | Endpoint                                 | Purpose                          |
 |--------|------------------------------------------|----------------------------------|
@@ -151,8 +151,11 @@ From now on, every `git push` to main auto-deploys both projects. No manual work
 | GET    | `/api/hotels/featured/list`              | Featured hotels                  |
 | GET    | `/api/hotels/destinations/popular`       | Popular cities                   |
 | POST   | `/api/hotels`                            | Create a hotel (admin)           |
-| POST   | `/api/bookings`                          | Create a booking                 |
+| POST   | `/api/bookings`                          | Create a booking (pay at hotel)  |
 | GET    | `/api/bookings/:email`                   | List bookings for an email       |
+| POST   | `/api/payments/create-order`             | Create pending booking + Razorpay order (prepaid) |
+| POST   | `/api/payments/verify`                   | Verify payment signature, confirm booking |
+| POST   | `/api/payments/webhook`                  | Razorpay webhook (payment.captured/failed) |
 
 **Filter examples:**
 - `/api/hotels?city=Goa`
@@ -161,7 +164,7 @@ From now on, every `git push` to main auto-deploys both projects. No manual work
 
 ---
 
-## 🛠️ Troubleshooting
+## Troubleshooting
 
 **"Couldn't load hotels" on the frontend**
 → Backend isn't running or `VITE_API_URL` is wrong. Check the browser console.
@@ -177,7 +180,7 @@ From now on, every `git push` to main auto-deploys both projects. No manual work
 
 ---
 
-## 🎨 Brand
+##  Brand
 
 - Primary: Sea Green `#2E8B7F`
 - Dark: `#0F4A43`
@@ -187,4 +190,4 @@ From now on, every `git push` to main auto-deploys both projects. No manual work
 
 ---
 
-Built with care. ✦
+Built with care. 
