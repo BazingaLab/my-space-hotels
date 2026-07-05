@@ -124,6 +124,7 @@ export const adminCreateHotel = async (req, res) => {
 
     // Provision owner login first so we can stamp owner_id onto the hotel
     let credentials = null;
+    let provisioningError = null;
     if (hotel.owner_email) {
       try {
         const { ownerId, credentials: creds } = await provisionOwnerAccount(hotel.owner_email);
@@ -131,6 +132,7 @@ export const adminCreateHotel = async (req, res) => {
         credentials = creds;
       } catch (e) {
         console.error("Owner provisioning failed:", e.message);
+        provisioningError = e.message;
         // don't block hotel creation if owner provisioning fails
       }
     }
@@ -139,18 +141,59 @@ export const adminCreateHotel = async (req, res) => {
     if (error) throw error;
     try { await ensureWallet(data.id); } catch (e) { console.error("Wallet create failed:", e.message); }
 
-    res.status(201).json({ ...data, ownerCredentials: credentials });
+    res.status(201).json({ ...data, ownerCredentials: credentials, ownerProvisioningError: provisioningError });
   } catch (error) {
     res.status(400).json({ message: error.message });
   }
 };
 
-// PUT /api/admin/hotels/:id — full update; stamps updated_at
+// PUT /api/admin/hotels/:id — full update; stamps updated_at.
+// Also provisions the owner's login if the hotel doesn't have one yet (or the
+// owner_email changed) — covers hotels created before owner_email was set,
+// or where the first provisioning attempt failed silently.
 export const adminUpdateHotel = async (req, res) => {
   try {
-    const { data, error } = await supabase.from("hotels").update({ ...req.body, updated_at: new Date().toISOString() }).eq("id", req.params.id).select().single();
+    const { data: existing, error: fetchErr } = await supabase.from("hotels").select("owner_id, owner_email").eq("id", req.params.id).single();
+    if (fetchErr) throw fetchErr;
+
+    const patch = { ...req.body, updated_at: new Date().toISOString() };
+    let credentials = null;
+    let provisioningError = null;
+
+    const emailChanged = patch.owner_email && patch.owner_email !== existing.owner_email;
+    if (patch.owner_email && (!existing.owner_id || emailChanged)) {
+      try {
+        const { ownerId, credentials: creds } = await provisionOwnerAccount(patch.owner_email);
+        patch.owner_id = ownerId;
+        credentials = creds;
+      } catch (e) {
+        console.error("Owner provisioning failed:", e.message);
+        provisioningError = e.message;
+      }
+    }
+
+    const { data, error } = await supabase.from("hotels").update(patch).eq("id", req.params.id).select().single();
     if (error) throw error;
-    res.json(data);
+    res.json({ ...data, ownerCredentials: credentials, ownerProvisioningError: provisioningError });
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  }
+};
+
+// POST /api/admin/hotels/:id/reset-owner-password
+// Generates a fresh temp password for a hotel's existing owner account —
+// for when the one-time credentials box was closed before anyone copied it.
+export const resetOwnerPassword = async (req, res) => {
+  try {
+    const { data: hotel, error: hErr } = await supabase.from("hotels").select("owner_id, owner_email").eq("id", req.params.id).single();
+    if (hErr) throw hErr;
+    if (!hotel.owner_id) return res.status(400).json({ message: "This hotel has no owner account yet — set an owner_email and save to create one" });
+
+    const tempPassword = genTempPassword();
+    const { error } = await supabase.auth.admin.updateUserById(hotel.owner_id, { password: tempPassword });
+    if (error) throw error;
+
+    res.json({ email: hotel.owner_email, tempPassword });
   } catch (error) {
     res.status(400).json({ message: error.message });
   }

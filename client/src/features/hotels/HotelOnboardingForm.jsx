@@ -3,7 +3,7 @@ import { theme } from "../../lib/theme.js";
 import { adminApi } from "../../lib/api.js";
 import { useAuth } from "../../context/AuthContext.jsx";
 import { supabase } from "../../lib/supabase.js";
-import { Save, Building2, User, FileText, MapPin, Clock, IndianRupee, Landmark, Upload, Image as ImageIcon } from "lucide-react";
+import { Save, Building2, User, FileText, MapPin, Clock, IndianRupee, Landmark, Upload, Image as ImageIcon, KeyRound } from "lucide-react";
 import AddressInput from "../../shared/components/AddressInput.jsx";
 
 const HOTEL_TYPES = ["Budget", "Premium", "Resort"];
@@ -30,6 +30,7 @@ export default function HotelOnboardingForm({ initial = null, onSaved }) {
   const [ownerCreds, setOwnerCreds] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+  const [resetting, setResetting] = useState(false);
 
   const set = (k, v) => setF(s => ({ ...s, [k]: v }));
   const toggleAmenity = (a) => setF(s => ({ ...s, amenities: s.amenities.includes(a) ? s.amenities.filter(x => x !== a) : [...s.amenities, a] }));
@@ -69,18 +70,32 @@ export default function HotelOnboardingForm({ initial = null, onSaved }) {
         commission_percent: Number(f.commission_percent),
         bank_details: { bank_account_name: f.bank_account_name, bank_account_number: f.bank_account_number, bank_ifsc: f.bank_ifsc, bank_name: f.bank_name },
       };
+      let res;
       if (initial?.id) {
-        await adminApi.updateHotel(initial.id, payload);
+        res = await adminApi.updateHotel(initial.id, payload);
       } else {
-        const res = await adminApi.createHotel(payload);
-        // Show auto-provisioned owner credentials if a new login was created
-        if (res?.ownerCredentials) setOwnerCreds(res.ownerCredentials);
+        res = await adminApi.createHotel(payload);
       }
+      // Show auto-provisioned owner credentials if a new login was created —
+      // can happen on create OR on an edit that fills in owner_email for the
+      // first time / points it at a hotel with no owner account yet.
+      if (res?.ownerCredentials) setOwnerCreds(res.ownerCredentials);
+      if (res?.ownerProvisioningError) setError(`Hotel saved, but owner login could not be created: ${res.ownerProvisioningError}`);
       setOk(true);
       if (onSaved) onSaved();
       if (!initial) setF(empty);
     } catch (err) { setError(err.message); }
     finally { setSaving(false); }
+  };
+
+  const handleResetPassword = async () => {
+    if (!window.confirm(`Generate a new temporary password for ${initial.owner_email}? Their current password will stop working.`)) return;
+    setResetting(true); setError(null);
+    try {
+      const creds = await adminApi.resetOwnerPassword(initial.id);
+      setOwnerCreds(creds);
+    } catch (e) { setError(e.message); }
+    finally { setResetting(false); }
   };
 
   const inp = { width: "100%", padding: "11px 14px", border: `1px solid ${theme.SAND}`, background: "#fff", fontSize: 14, color: theme.INK, outline: "none", fontFamily: "Inter, sans-serif", boxSizing: "border-box" };
@@ -162,6 +177,13 @@ export default function HotelOnboardingForm({ initial = null, onSaved }) {
           <Field label="Owner Email" k="owner_email" type="email" />
           <Field label="Referred By" k="referred_by_name" />
         </div>
+        {initial?.id && initial?.owner_id && (
+          <div style={{ marginTop: 16 }}>
+            <button type="button" onClick={handleResetPassword} disabled={resetting} style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "transparent", border: `1px solid ${theme.SAND}`, color: theme.SEA_DARK, padding: "10px 20px", fontSize: 12, letterSpacing: "0.1em", textTransform: "uppercase", cursor: resetting ? "not-allowed" : "pointer" }}>
+              <KeyRound size={14} /> {resetting ? "Generating…" : "Reset Owner Password"}
+            </button>
+          </div>
+        )}
       </Section>
 
       <Section icon={FileText} title="Legal & Tax">
@@ -215,10 +237,11 @@ export default function HotelOnboardingForm({ initial = null, onSaved }) {
       {error && <div style={{ color: "#a33", padding: 14, background: "#fff5f5", border: "1px solid #fcc", marginBottom: 16, fontSize: 13 }}>{error}</div>}
       {ok && <div style={{ color: theme.SEA_DARK, padding: 14, background: "#E8F5F3", border: `1px solid ${theme.SEA}33`, marginBottom: 16, fontSize: 13 }}>✓ Hotel saved successfully</div>}
 
-      {/* Auto-provisioned owner credentials — shown once after hotel creation */}
+      {/* Auto-provisioned owner credentials — shown once after creation, an
+          edit that provisions a missing account, or a manual password reset */}
       {ownerCreds && (
         <div style={{ padding: 20, background: "#FFF8E7", border: "1px solid #E8C97A", marginBottom: 16 }}>
-          <div style={{ fontWeight: 600, color: "#8A6D1F", marginBottom: 10, fontSize: 14 }}>🔑 Owner login created — share these with the owner</div>
+          <div style={{ fontWeight: 600, color: "#8A6D1F", marginBottom: 10, fontSize: 14 }}>🔑 Owner login credentials — share these with the owner</div>
           <div style={{ fontSize: 13, lineHeight: 1.9, fontFamily: "monospace", color: theme.INK }}>
             <div>Portal: <strong>/hotel-portal/login</strong></div>
             <div>Email: <strong>{ownerCreds.email}</strong></div>

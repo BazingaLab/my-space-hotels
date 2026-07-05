@@ -32,6 +32,7 @@ export const adminApi = {
   getHotels: () => request("/api/admin/hotels"),
   createHotel: (data) => request("/api/admin/hotels", { method: "POST", body: JSON.stringify(data) }),
   updateHotel: (id, data) => request(`/api/admin/hotels/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+  resetOwnerPassword: (id) => request(`/api/admin/hotels/${id}/reset-owner-password`, { method: "POST" }),
   deleteHotel: (id) => request(`/api/admin/hotels/${id}`, { method: "DELETE" }),
   getBookings: () => request("/api/admin/bookings"),
   getOwnerBookings: (ownerId) => request(`/api/admin/bookings/owner/${ownerId}`),
@@ -84,6 +85,9 @@ export const bookingMgmtApi = {
   cancel: (id, data) => request(`/api/booking-mgmt/${id}/cancel`, { method: "POST", body: JSON.stringify(data) }),
   transfer: (id, new_hotel_id) => request(`/api/booking-mgmt/${id}/transfer`, { method: "POST", body: JSON.stringify({ new_hotel_id }) }),
   update: (id, patch) => request(`/api/booking-mgmt/${id}`, { method: "PATCH", body: JSON.stringify(patch) }),
+  checkIn: (id) => request(`/api/booking-mgmt/${id}/checkin`, { method: "POST" }),
+  checkOut: (id) => request(`/api/booking-mgmt/${id}/checkout`, { method: "POST" }),
+  markNoShow: (id) => request(`/api/booking-mgmt/${id}/no-show`, { method: "POST" }),
 };
 
 export const teamApi = {

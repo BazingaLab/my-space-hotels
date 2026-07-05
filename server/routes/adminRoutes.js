@@ -1,7 +1,7 @@
 import express from "express";
 import {
   getUserRole, promoteUser, getAllUsers,
-  adminGetHotels, adminCreateHotel, adminUpdateHotel, adminDeleteHotel,
+  adminGetHotels, adminCreateHotel, adminUpdateHotel, adminDeleteHotel, resetOwnerPassword,
   adminGetBookings, hotelAdminGetBookings,
   adminGetAnalytics,
 } from "../controllers/adminController.js";
@@ -14,6 +14,7 @@ router.get("/users", getAllUsers);
 router.get("/hotels", adminGetHotels);
 router.post("/hotels", adminCreateHotel);
 router.put("/hotels/:id", adminUpdateHotel);
+router.post("/hotels/:id/reset-owner-password", resetOwnerPassword);
 router.delete("/hotels/:id", adminDeleteHotel);
 router.get("/bookings", adminGetBookings);
 router.get("/bookings/owner/:owner_id", hotelAdminGetBookings);

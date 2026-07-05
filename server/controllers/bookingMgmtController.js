@@ -153,3 +153,58 @@ export const stats = async (req, res) => {
     res.json({ ...buckets, total: data.length, revenue });
   } catch (e) { res.status(500).json({ message: e.message }); }
 };
+
+// POST /api/booking-mgmt/:id/checkin — front-desk marks the guest as arrived.
+export const checkIn = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { data: booking, error: bErr } = await supabase.from("bookings").select("*").eq("id", id).single();
+    if (bErr) throw bErr;
+    if (booking.status === "cancelled") return res.status(400).json({ message: "Booking is cancelled" });
+    if (booking.checkin_status === "checked_in") return res.status(400).json({ message: "Already checked in" });
+    if (booking.checkin_status === "checked_out") return res.status(400).json({ message: "Guest has already checked out" });
+
+    const { data, error } = await supabase.from("bookings").update({
+      checkin_status: "checked_in", checked_in_at: new Date().toISOString(),
+    }).eq("id", id).select().single();
+    if (error) throw error;
+
+    await audit({ action: "checkin", entityType: "booking", entityId: id, beforeData: booking, afterData: data });
+    res.json(data);
+  } catch (e) { res.status(400).json({ message: e.message }); }
+};
+
+// POST /api/booking-mgmt/:id/checkout — front-desk marks the guest as departed.
+export const checkOut = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { data: booking, error: bErr } = await supabase.from("bookings").select("*").eq("id", id).single();
+    if (bErr) throw bErr;
+    if (booking.checkin_status !== "checked_in") return res.status(400).json({ message: "Guest hasn't checked in yet" });
+
+    const { data, error } = await supabase.from("bookings").update({
+      checkin_status: "checked_out", checked_out_at: new Date().toISOString(),
+    }).eq("id", id).select().single();
+    if (error) throw error;
+
+    await audit({ action: "checkout", entityType: "booking", entityId: id, beforeData: booking, afterData: data });
+    res.json(data);
+  } catch (e) { res.status(400).json({ message: e.message }); }
+};
+
+// POST /api/booking-mgmt/:id/no-show — guest never arrived for their stay.
+export const markNoShow = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { data: booking, error: bErr } = await supabase.from("bookings").select("*").eq("id", id).single();
+    if (bErr) throw bErr;
+    if (booking.status === "cancelled") return res.status(400).json({ message: "Booking is cancelled" });
+    if (booking.checkin_status !== "not_arrived") return res.status(400).json({ message: "Guest has already checked in or checked out" });
+
+    const { data, error } = await supabase.from("bookings").update({ checkin_status: "no_show" }).eq("id", id).select().single();
+    if (error) throw error;
+
+    await audit({ action: "no_show", entityType: "booking", entityId: id, beforeData: booking, afterData: data });
+    res.json(data);
+  } catch (e) { res.status(400).json({ message: e.message }); }
+};
