@@ -21,6 +21,37 @@ const empty = {
   building: "", street: "", landmark: "", district: "", post_office: "",
 };
 
+// Static styles — module-scope so Field/Section below can use them, and so
+// they aren't recreated as new objects on every render (minor perf bonus).
+const inp = { width: "100%", padding: "11px 14px", border: `1px solid ${theme.SAND}`, background: "#fff", fontSize: 14, color: theme.INK, outline: "none", fontFamily: "Inter, sans-serif", boxSizing: "border-box" };
+const lbl = { fontSize: 10, letterSpacing: "0.15em", color: theme.SEA_DARK, textTransform: "uppercase", marginBottom: 6, display: "block", fontWeight: 600 };
+const card = { background: "#fff", border: `1px solid ${theme.SAND}`, padding: 28, marginBottom: 20 };
+const sectionTitle = { display: "flex", alignItems: "center", gap: 8, marginBottom: 20 };
+const grid2 = { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 };
+const grid3 = { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16 };
+
+// IMPORTANT: these must live OUTSIDE HotelOnboardingForm. Defining a
+// component inside another component's body creates a brand-new function
+// identity on every render, so React unmounts/remounts the underlying
+// <input> on every keystroke — that's what was kicking the cursor out.
+function Section({ icon: Icon, title, children }) {
+  return (
+    <div style={card}>
+      <div style={sectionTitle}><Icon size={18} color={theme.SEA} /><h3 className="serif" style={{ fontSize: 20, fontWeight: 400 }}>{title}</h3></div>
+      {children}
+    </div>
+  );
+}
+
+function Field({ label, k, type = "text", ph = "", req = false, f, set }) {
+  return (
+    <div>
+      <label style={lbl}>{label}{req && " *"}</label>
+      <input type={type} required={req} style={inp} placeholder={ph} value={f[k] ?? ""} onChange={e => set(k, e.target.value)} />
+    </div>
+  );
+}
+
 export default function HotelOnboardingForm({ initial = null, onSaved }) {
   const { user } = useAuth();
   const [f, setF] = useState(initial ? { ...empty, ...initial, ...(initial.bank_details || {}) } : empty);
@@ -76,9 +107,6 @@ export default function HotelOnboardingForm({ initial = null, onSaved }) {
       } else {
         res = await adminApi.createHotel(payload);
       }
-      // Show auto-provisioned owner credentials if a new login was created —
-      // can happen on create OR on an edit that fills in owner_email for the
-      // first time / points it at a hotel with no owner account yet.
       if (res?.ownerCredentials) setOwnerCreds(res.ownerCredentials);
       if (res?.ownerProvisioningError) setError(`Hotel saved, but owner login could not be created: ${res.ownerProvisioningError}`);
       setOk(true);
@@ -98,35 +126,18 @@ export default function HotelOnboardingForm({ initial = null, onSaved }) {
     finally { setResetting(false); }
   };
 
-  const inp = { width: "100%", padding: "11px 14px", border: `1px solid ${theme.SAND}`, background: "#fff", fontSize: 14, color: theme.INK, outline: "none", fontFamily: "Inter, sans-serif", boxSizing: "border-box" };
-  const lbl = { fontSize: 10, letterSpacing: "0.15em", color: theme.SEA_DARK, textTransform: "uppercase", marginBottom: 6, display: "block", fontWeight: 600 };
-  const card = { background: "#fff", border: `1px solid ${theme.SAND}`, padding: 28, marginBottom: 20 };
-  const sectionTitle = { display: "flex", alignItems: "center", gap: 8, marginBottom: 20 };
-  const grid2 = { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 };
-  const grid3 = { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16 };
-
-  const Section = ({ icon: Icon, title, children }) => (
-    <div style={card}>
-      <div style={sectionTitle}><Icon size={18} color={theme.SEA} /><h3 className="serif" style={{ fontSize: 20, fontWeight: 400 }}>{title}</h3></div>
-      {children}
-    </div>
-  );
-  const Field = ({ label, k, type = "text", ph = "", req = false }) => (
-    <div><label style={lbl}>{label}{req && " *"}</label><input type={type} required={req} style={inp} placeholder={ph} value={f[k] ?? ""} onChange={e => set(k, e.target.value)} /></div>
-  );
-
   return (
     <form onSubmit={submit}>
       <Section icon={Building2} title="Property Details">
-        <div style={{ marginBottom: 16 }}><Field label="Hotel Name" k="name" ph="The Heritage Verandah" req /></div>
+        <div style={{ marginBottom: 16 }}><Field label="Hotel Name" k="name" ph="The Heritage Verandah" req f={f} set={set} /></div>
         <div style={grid3}>
           <div><label style={lbl}>Hotel Type *</label><select style={inp} value={f.hotel_type} onChange={e => set("hotel_type", e.target.value)}>{HOTEL_TYPES.map(t => <option key={t}>{t}</option>)}</select></div>
           <div><label style={lbl}>Category Tag</label><select style={inp} value={f.tag} onChange={e => set("tag", e.target.value)}>{TAGS.map(t => <option key={t}>{t}</option>)}</select></div>
           <div><label style={lbl}>Status</label><select style={inp} value={f.hotel_status} onChange={e => set("hotel_status", e.target.value)}><option value="active">Active</option><option value="inactive">Inactive</option></select></div>
         </div>
         <div style={{ ...grid2, marginTop: 16 }}>
-          <Field label="Total Rooms" k="rooms" type="number" />
-          <Field label="Price / Night (₹)" k="price" type="number" req />
+          <Field label="Total Rooms" k="rooms" type="number" f={f} set={set} />
+          <Field label="Price / Night (₹)" k="price" type="number" req f={f} set={set} />
         </div>
 
         {/* Cover image — drag & drop + click + URL fallback */}
@@ -166,16 +177,16 @@ export default function HotelOnboardingForm({ initial = null, onSaved }) {
           <input style={{ ...inp, marginTop: 10 }} placeholder="…or paste an image URL" value={f.cover_image || ""} onChange={e => set("cover_image", e.target.value)} />
         </div>
 
-        <div style={{ marginTop: 16 }}><Field label="Short Description" k="short_description" /></div>
+        <div style={{ marginTop: 16 }}><Field label="Short Description" k="short_description" f={f} set={set} /></div>
         <div style={{ marginTop: 16 }}><label style={lbl}>Full Description</label><textarea style={{ ...inp, minHeight: 90, resize: "vertical" }} value={f.description} onChange={e => set("description", e.target.value)} /></div>
       </Section>
 
       <Section icon={User} title="Owner & Contact">
         <div style={grid2}>
-          <Field label="Owner Name" k="owner_name" req />
-          <Field label="Contact Number" k="contact_number" ph="+91..." req />
-          <Field label="Owner Email" k="owner_email" type="email" />
-          <Field label="Referred By" k="referred_by_name" />
+          <Field label="Owner Name" k="owner_name" req f={f} set={set} />
+          <Field label="Contact Number" k="contact_number" ph="+91..." req f={f} set={set} />
+          <Field label="Owner Email" k="owner_email" type="email" f={f} set={set} />
+          <Field label="Referred By" k="referred_by_name" f={f} set={set} />
         </div>
         {initial?.id && initial?.owner_id && (
           <div style={{ marginTop: 16 }}>
@@ -188,8 +199,8 @@ export default function HotelOnboardingForm({ initial = null, onSaved }) {
 
       <Section icon={FileText} title="Legal & Tax">
         <div style={grid2}>
-          <Field label="GST Number" k="gst_number" />
-          <Field label="PAN Number" k="pan_number" />
+          <Field label="GST Number" k="gst_number" f={f} set={set} />
+          <Field label="PAN Number" k="pan_number" f={f} set={set} />
         </div>
       </Section>
 
@@ -199,13 +210,13 @@ export default function HotelOnboardingForm({ initial = null, onSaved }) {
           value={{ building: f.building, street: f.street, landmark: f.landmark, pincode: f.pincode, post_office: f.post_office, city: f.city, district: f.district, state: f.state }}
           onChange={addr => setF(s => ({ ...s, ...addr }))}
         />
-        <div style={{ marginTop: 16 }}><Field label="Google Map Link" k="google_map_link" ph="https://maps.google.com/..." /></div>
+        <div style={{ marginTop: 16 }}><Field label="Google Map Link" k="google_map_link" ph="https://maps.google.com/..." f={f} set={set} /></div>
       </Section>
 
       <Section icon={Clock} title="Timings & Amenities">
         <div style={grid2}>
-          <Field label="Check-in Time" k="checkin_time" type="time" />
-          <Field label="Check-out Time" k="checkout_time" type="time" />
+          <Field label="Check-in Time" k="checkin_time" type="time" f={f} set={set} />
+          <Field label="Check-out Time" k="checkout_time" type="time" f={f} set={set} />
         </div>
         <div style={{ marginTop: 16 }}>
           <label style={lbl}>Amenities</label>
@@ -219,26 +230,24 @@ export default function HotelOnboardingForm({ initial = null, onSaved }) {
 
       <Section icon={IndianRupee} title="Agreement & Commission">
         <div style={grid3}>
-          <Field label="Agreement Start" k="agreement_start_date" type="date" />
-          <Field label="Agreement End" k="agreement_end_date" type="date" />
-          <Field label="Commission %" k="commission_percent" type="number" />
+          <Field label="Agreement Start" k="agreement_start_date" type="date" f={f} set={set} />
+          <Field label="Agreement End" k="agreement_end_date" type="date" f={f} set={set} />
+          <Field label="Commission %" k="commission_percent" type="number" f={f} set={set} />
         </div>
       </Section>
 
       <Section icon={Landmark} title="Bank Details">
         <div style={grid2}>
-          <Field label="Account Holder Name" k="bank_account_name" />
-          <Field label="Account Number" k="bank_account_number" />
-          <Field label="IFSC Code" k="bank_ifsc" />
-          <Field label="Bank Name" k="bank_name" />
+          <Field label="Account Holder Name" k="bank_account_name" f={f} set={set} />
+          <Field label="Account Number" k="bank_account_number" f={f} set={set} />
+          <Field label="IFSC Code" k="bank_ifsc" f={f} set={set} />
+          <Field label="Bank Name" k="bank_name" f={f} set={set} />
         </div>
       </Section>
 
       {error && <div style={{ color: "#a33", padding: 14, background: "#fff5f5", border: "1px solid #fcc", marginBottom: 16, fontSize: 13 }}>{error}</div>}
       {ok && <div style={{ color: theme.SEA_DARK, padding: 14, background: "#E8F5F3", border: `1px solid ${theme.SEA}33`, marginBottom: 16, fontSize: 13 }}>✓ Hotel saved successfully</div>}
 
-      {/* Auto-provisioned owner credentials — shown once after creation, an
-          edit that provisions a missing account, or a manual password reset */}
       {ownerCreds && (
         <div style={{ padding: 20, background: "#FFF8E7", border: "1px solid #E8C97A", marginBottom: 16 }}>
           <div style={{ fontWeight: 600, color: "#8A6D1F", marginBottom: 10, fontSize: 14 }}>🔑 Owner login credentials — share these with the owner</div>
