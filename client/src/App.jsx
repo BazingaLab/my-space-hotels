@@ -188,6 +188,15 @@ function AppRoutes() {
         />
 
         <Route
+          path="/admin/hotels/:id/edit"
+          element={
+            <ProtectedRoute requireAdmin>
+              <AdminAddHotel />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
           path="/admin/analytics"
           element={
             <ProtectedRoute requireAdmin>
