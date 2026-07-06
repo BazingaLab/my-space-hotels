@@ -1,9 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { theme } from "../../lib/theme.js";
-import { adminApi } from "../../lib/api.js";
+import { adminApi, walletsApi } from "../../lib/api.js";
 import { useAuth } from "../../context/AuthContext.jsx";
 import { supabase } from "../../lib/supabase.js";
-import { Save, Building2, User, FileText, MapPin, Clock, IndianRupee, Landmark, Upload, Image as ImageIcon, KeyRound } from "lucide-react";
+import { Save, Building2, User, FileText, MapPin, Clock, IndianRupee, Landmark, Upload, Image as ImageIcon, KeyRound, Star } from "lucide-react";
 import AddressInput from "../../shared/components/AddressInput.jsx";
 
 const HOTEL_TYPES = ["Budget", "Premium", "Resort"];
@@ -15,14 +15,12 @@ const empty = {
   gst_number: "", pan_number: "", property_address: "", city: "", state: "", pincode: "",
   google_map_link: "", description: "", short_description: "", checkin_time: "14:00", checkout_time: "11:00",
   amenities: [], rooms: 1, price: 0, tag: "Boutique", cover_image: "", hotel_status: "active",
-  agreement_start_date: "", agreement_end_date: "", commission_percent: 0,
+  agreement_start_date: "", agreement_end_date: "", commission_percent: 35,
   bank_account_name: "", bank_account_number: "", bank_ifsc: "", bank_name: "",
   referred_by_name: "",
   building: "", street: "", landmark: "", district: "", post_office: "",
 };
 
-// Static styles — module-scope so Field/Section below can use them, and so
-// they aren't recreated as new objects on every render (minor perf bonus).
 const inp = { width: "100%", padding: "11px 14px", border: `1px solid ${theme.SAND}`, background: "#fff", fontSize: 14, color: theme.INK, outline: "none", fontFamily: "Inter, sans-serif", boxSizing: "border-box" };
 const lbl = { fontSize: 10, letterSpacing: "0.15em", color: theme.SEA_DARK, textTransform: "uppercase", marginBottom: 6, display: "block", fontWeight: 600 };
 const card = { background: "#fff", border: `1px solid ${theme.SAND}`, padding: 28, marginBottom: 20 };
@@ -30,10 +28,6 @@ const sectionTitle = { display: "flex", alignItems: "center", gap: 8, marginBott
 const grid2 = { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 };
 const grid3 = { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16 };
 
-// IMPORTANT: these must live OUTSIDE HotelOnboardingForm. Defining a
-// component inside another component's body creates a brand-new function
-// identity on every render, so React unmounts/remounts the underlying
-// <input> on every keystroke — that's what was kicking the cursor out.
 function Section({ icon: Icon, title, children }) {
   return (
     <div style={card}>
@@ -62,11 +56,17 @@ export default function HotelOnboardingForm({ initial = null, onSaved }) {
   const [uploading, setUploading] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [resetting, setResetting] = useState(false);
+  const [eligibility, setEligibility] = useState(null);
+
+  useEffect(() => {
+    if (initial?.id) {
+      walletsApi.eligibility(initial.id).then(setEligibility).catch(() => {});
+    }
+  }, [initial?.id]);
 
   const set = (k, v) => setF(s => ({ ...s, [k]: v }));
   const toggleAmenity = (a) => setF(s => ({ ...s, amenities: s.amenities.includes(a) ? s.amenities.filter(x => x !== a) : [...s.amenities, a] }));
 
-  // Upload cover image to Supabase Storage; store its public URL
   const uploadCover = async (file) => {
     if (!file) return;
     if (!file.type.startsWith("image/")) { setError("Only image files allowed."); return; }
@@ -140,7 +140,6 @@ export default function HotelOnboardingForm({ initial = null, onSaved }) {
           <Field label="Price / Night (₹)" k="price" type="number" req f={f} set={set} />
         </div>
 
-        {/* Cover image — drag & drop + click + URL fallback */}
         <div style={{ marginTop: 16 }}>
           <label style={lbl}>Cover Image</label>
           <div
@@ -234,6 +233,18 @@ export default function HotelOnboardingForm({ initial = null, onSaved }) {
           <Field label="Agreement End" k="agreement_end_date" type="date" f={f} set={set} />
           <Field label="Commission %" k="commission_percent" type="number" f={f} set={set} />
         </div>
+        {eligibility && (
+          <div style={{
+            marginTop: 12, padding: "10px 14px", fontSize: 12,
+            background: eligibility.eligible ? "#E8F5F3" : "#F7F5F0",
+            color: eligibility.eligible ? theme.SEA_DARK : theme.MUTED,
+            display: "flex", alignItems: "center", gap: 8,
+          }}>
+            {eligibility.eligible && <Star size={13} />}
+            {eligibility.confirmedBookings} confirmed bookings · {eligibility.monthsActive} months active
+            {eligibility.eligible ? ` — good-biz eligible (${eligibility.reason})` : " — not yet good-biz eligible"}
+          </div>
+        )}
       </Section>
 
       <Section icon={Landmark} title="Bank Details">

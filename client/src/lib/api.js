@@ -74,6 +74,7 @@ export const walletsApi = {
   summary: () => request("/api/wallets/summary"),
   getHotelWallet: (hotelId) => request(`/api/wallets/hotel/${hotelId}`),
   settle: (data) => request("/api/wallets/settle", { method: "POST", body: JSON.stringify(data) }),
+  eligibility: (hotelId) => request(`/api/wallets/eligibility/${hotelId}`),
 };
 
 export const bookingMgmtApi = {
