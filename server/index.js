@@ -8,6 +8,7 @@ import pendingRoutes from "./routes/pendingRoutes.js";
 import complaintsRoutes from "./routes/complaintsRoutes.js";
 import paymentRoutes, { webhook as razorpayWebhook } from "./routes/paymentRoutes.js";
 import bookingMgmtRoutes from "./routes/bookingMgmtRoutes.js";
+import walletRoutes from "./routes/walletRoutes.js";
 
 dotenv.config();
 
@@ -36,6 +37,7 @@ app.use("/api/pending", pendingRoutes);
 app.use("/api/complaints", complaintsRoutes);
 app.use("/api/payments", paymentRoutes);
 app.use("/api/booking-mgmt", bookingMgmtRoutes);
+app.use("/api/wallets", walletRoutes);
 
 app.use((req, res) => res.status(404).json({ message: "Route not found" }));
 app.use((err, req, res, next) => {

@@ -72,6 +72,7 @@ export const customersApi = {
 export const walletsApi = {
   list: () => request("/api/wallets"),
   summary: () => request("/api/wallets/summary"),
+  commissions: () => request("/api/wallets/commissions"),
   getHotelWallet: (hotelId) => request(`/api/wallets/hotel/${hotelId}`),
   settle: (data) => request("/api/wallets/settle", { method: "POST", body: JSON.stringify(data) }),
   eligibility: (hotelId) => request(`/api/wallets/eligibility/${hotelId}`),

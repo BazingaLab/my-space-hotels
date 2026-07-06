@@ -24,3 +24,6 @@ export function useSettle() {
     onSuccess: () => qc.invalidateQueries({ queryKey: walletKeys.all }),
   });
 }
+export function useCommissionReport() {
+  return useQuery({ queryKey: [...walletKeys.all, "commissions"], queryFn: () => walletsApi.commissions() });
+}
