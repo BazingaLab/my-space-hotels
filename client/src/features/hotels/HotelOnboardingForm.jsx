@@ -11,7 +11,7 @@ const TAGS = ["Heritage", "Beachfront", "Boutique", "Hotel", "Resort", "BnB"];
 const AMENITIES = ["WiFi", "AC", "Parking", "Pool", "Spa", "Restaurant", "Bar", "Gym", "Room Service", "Laundry", "Airport Transfer", "Power Backup", "CCTV", "Elevator"];
 
 const empty = {
-  name: "", hotel_type: "Budget", owner_name: "", contact_number: "", owner_email: "",
+  name: "", hotel_type: "Budget", owner_name: "", contact_number: "", owner_email: "", owner_password: "",
   gst_number: "", pan_number: "", property_address: "", city: "", state: "", pincode: "",
   google_map_link: "", description: "", short_description: "", checkin_time: "14:00", checkout_time: "11:00",
   amenities: [], rooms: 1, price: 0, tag: "Boutique", cover_image: "", hotel_status: "active",
@@ -48,7 +48,7 @@ function Field({ label, k, type = "text", ph = "", req = false, f, set }) {
 
 export default function HotelOnboardingForm({ initial = null, onSaved }) {
   const { user } = useAuth();
-  const [f, setF] = useState(initial ? { ...empty, ...initial, ...(initial.bank_details || {}) } : empty);
+  const [f, setF] = useState(initial ? { ...empty, ...initial, ...(initial.bank_details || {}), owner_password: "" } : empty);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
   const [ok, setOk] = useState(false);
@@ -85,7 +85,14 @@ export default function HotelOnboardingForm({ initial = null, onSaved }) {
 
   const submit = async (e) => {
     e.preventDefault();
-    setSaving(true); setError(null); setOk(false); setOwnerCreds(null);
+    setError(null); setOk(false); setOwnerCreds(null);
+
+    if (f.owner_password && f.owner_password.trim().length < 6) {
+      setError("Owner password must be at least 6 characters — or leave it blank to auto-generate one.");
+      return;
+    }
+
+    setSaving(true);
     try {
       const payload = {
         name: f.name, hotel_type: f.hotel_type, owner_name: f.owner_name, contact_number: f.contact_number,
@@ -101,6 +108,10 @@ export default function HotelOnboardingForm({ initial = null, onSaved }) {
         commission_percent: Number(f.commission_percent),
         bank_details: { bank_account_name: f.bank_account_name, bank_account_number: f.bank_account_number, bank_ifsc: f.bank_ifsc, bank_name: f.bank_name },
       };
+      if (f.owner_password && f.owner_password.trim()) {
+        payload.owner_password = f.owner_password.trim();
+      }
+
       let res;
       if (initial?.id) {
         res = await adminApi.updateHotel(initial.id, payload);
@@ -110,6 +121,7 @@ export default function HotelOnboardingForm({ initial = null, onSaved }) {
       if (res?.ownerCredentials) setOwnerCreds(res.ownerCredentials);
       if (res?.ownerProvisioningError) setError(`Hotel saved, but owner login could not be created: ${res.ownerProvisioningError}`);
       setOk(true);
+      set("owner_password", "");
       if (onSaved) onSaved();
       if (!initial) setF(empty);
     } catch (err) { setError(err.message); }
@@ -187,10 +199,20 @@ export default function HotelOnboardingForm({ initial = null, onSaved }) {
           <Field label="Owner Email" k="owner_email" type="email" f={f} set={set} />
           <Field label="Referred By" k="referred_by_name" f={f} set={set} />
         </div>
+
+        <div style={{ marginTop: 16 }}>
+          <label style={lbl}>Owner Login Password {initial?.owner_id ? "(leave blank to keep unchanged)" : "(leave blank to auto-generate)"}</label>
+          <input type="text" style={inp} placeholder="e.g. a memorable password of your choosing" value={f.owner_password} onChange={e => set("owner_password", e.target.value)} />
+          <div style={{ fontSize: 11, color: theme.MUTED, marginTop: 4 }}>
+            Login email is always the Owner Email above. Minimum 6 characters if you set one.
+            {initial?.owner_id && " Typing something here and saving will reset their password to this."}
+          </div>
+        </div>
+
         {initial?.id && initial?.owner_id && (
           <div style={{ marginTop: 16 }}>
             <button type="button" onClick={handleResetPassword} disabled={resetting} style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "transparent", border: `1px solid ${theme.SAND}`, color: theme.SEA_DARK, padding: "10px 20px", fontSize: 12, letterSpacing: "0.1em", textTransform: "uppercase", cursor: resetting ? "not-allowed" : "pointer" }}>
-              <KeyRound size={14} /> {resetting ? "Generating…" : "Reset Owner Password"}
+              <KeyRound size={14} /> {resetting ? "Generating…" : "Reset to Random Password"}
             </button>
           </div>
         )}
@@ -265,9 +287,9 @@ export default function HotelOnboardingForm({ initial = null, onSaved }) {
           <div style={{ fontSize: 13, lineHeight: 1.9, fontFamily: "monospace", color: theme.INK }}>
             <div>Portal: <strong>/hotel-portal/login</strong></div>
             <div>Email: <strong>{ownerCreds.email}</strong></div>
-            <div>Temp Password: <strong>{ownerCreds.tempPassword}</strong></div>
+            <div>Password: <strong>{ownerCreds.tempPassword}</strong></div>
           </div>
-          <div style={{ fontSize: 12, color: theme.MUTED, marginTop: 10 }}>Shown only once — the owner should change this password after first login.</div>
+          <div style={{ fontSize: 12, color: theme.MUTED, marginTop: 10 }}>Shown only once — save this now.</div>
         </div>
       )}
 

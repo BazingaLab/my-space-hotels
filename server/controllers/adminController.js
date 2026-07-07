@@ -30,13 +30,11 @@ export const promoteUser = async (req, res) => {
     if (!["hotel_admin", "guest"].includes(role)) {
       return res.status(400).json({ message: "Invalid role" });
     }
-    // upsert on user_id so a user only ever has one role row
     const { data, error } = await supabase
       .from("user_roles")
       .upsert([{ user_id, role }], { onConflict: "user_id" })
       .select().single();
     if (error) throw error;
-    // Link the hotel to its new owner
     if (hotel_id && role === "hotel_admin") {
       await supabase.from("hotels").update({ owner_id: user_id }).eq("id", hotel_id);
     }
@@ -47,8 +45,6 @@ export const promoteUser = async (req, res) => {
 };
 
 // GET /api/admin/users
-// Auth users live in auth.users (only reachable via auth.admin), roles live in
-// user_roles. We fetch both and merge them so the admin sees email + role together.
 export const getAllUsers = async (req, res) => {
   try {
     const { data: roles, error } = await supabase.from("user_roles").select("*");
@@ -79,61 +75,67 @@ export const adminGetHotels = async (req, res) => {
   }
 };
 
-// Generate a readable temporary password for first-time owner login.
+// Generate a readable temporary password — used only when the admin doesn't
+// type one in themselves.
 function genTempPassword() {
   const part = Math.random().toString(36).slice(-6);
   return `MSH-${part}${Math.floor(10 + Math.random() * 89)}`;
 }
 
 // Provision (or find) a hotel_admin login for the owner email.
-// Returns { ownerId, credentials } where credentials is non-null only when a
-// brand-new account was created (so we can show the temp password once).
-async function provisionOwnerAccount(ownerEmail) {
+// customPassword: if given, this becomes the account's password — for a new
+// account it's set at creation; for an EXISTING account it overwrites their
+// current password (only when explicitly provided — never touched otherwise).
+// Returns { ownerId, credentials } where credentials is non-null whenever a
+// password was actually set (new account, or an explicit reset on an old one).
+async function provisionOwnerAccount(ownerEmail, customPassword) {
   const email = ownerEmail.toLowerCase().trim();
 
-  // Is there already an auth user with this email?
   const { data: list } = await supabase.auth.admin.listUsers();
   const existing = list?.users?.find(u => (u.email || "").toLowerCase() === email);
 
   let ownerId, credentials = null;
   if (existing) {
     ownerId = existing.id;
+    if (customPassword) {
+      const { error: pwErr } = await supabase.auth.admin.updateUserById(existing.id, { password: customPassword });
+      if (pwErr) throw pwErr;
+      credentials = { email, tempPassword: customPassword };
+    }
   } else {
-    // Create a new confirmed auth user with a temp password
-    const tempPassword = genTempPassword();
+    const password = customPassword || genTempPassword();
     const { data: created, error: cErr } = await supabase.auth.admin.createUser({
-      email, password: tempPassword, email_confirm: true,
+      email, password, email_confirm: true,
     });
     if (cErr) throw cErr;
     ownerId = created.user.id;
-    credentials = { email, tempPassword };
+    credentials = { email, tempPassword: password };
   }
 
-  // Ensure they have the hotel_admin role (upsert so we never duplicate)
   await supabase.from("user_roles").upsert([{ user_id: ownerId, role: "hotel_admin" }], { onConflict: "user_id" });
   return { ownerId, credentials };
 }
 
 // POST /api/admin/hotels
 // Creates a hotel + wallet. If an owner_email is supplied, also provisions a
-// hotel_admin login for that owner and links the hotel to them. Returns any
-// generated credentials so the admin can hand them to the owner.
+// hotel_admin login for that owner (using owner_password if the admin set
+// one, otherwise auto-generated) and links the hotel to them.
 export const adminCreateHotel = async (req, res) => {
   try {
     const hotel = { ...req.body, images: req.body.images || [], amenities: req.body.amenities || [] };
+    const ownerPassword = hotel.owner_password;
+    delete hotel.owner_password; // never persisted onto the hotels row
 
-    // Provision owner login first so we can stamp owner_id onto the hotel
     let credentials = null;
     let provisioningError = null;
     if (hotel.owner_email) {
       try {
-        const { ownerId, credentials: creds } = await provisionOwnerAccount(hotel.owner_email);
+        const { ownerId, credentials: creds } = await provisionOwnerAccount(hotel.owner_email, ownerPassword);
         hotel.owner_id = ownerId;
         credentials = creds;
       } catch (e) {
         console.error("Owner provisioning failed:", e.message);
         provisioningError = e.message;
-        // don't block hotel creation if owner provisioning fails
       }
     }
 
@@ -148,22 +150,25 @@ export const adminCreateHotel = async (req, res) => {
 };
 
 // PUT /api/admin/hotels/:id — full update; stamps updated_at.
-// Also provisions the owner's login if the hotel doesn't have one yet (or the
-// owner_email changed) — covers hotels created before owner_email was set,
-// or where the first provisioning attempt failed silently.
+// Provisions the owner login if the hotel doesn't have one yet, the owner
+// email changed, OR the admin explicitly typed a password (which now
+// resets it even on an existing account).
 export const adminUpdateHotel = async (req, res) => {
   try {
     const { data: existing, error: fetchErr } = await supabase.from("hotels").select("owner_id, owner_email").eq("id", req.params.id).single();
     if (fetchErr) throw fetchErr;
 
     const patch = { ...req.body, updated_at: new Date().toISOString() };
+    const ownerPassword = patch.owner_password;
+    delete patch.owner_password;
+
     let credentials = null;
     let provisioningError = null;
 
     const emailChanged = patch.owner_email && patch.owner_email !== existing.owner_email;
-    if (patch.owner_email && (!existing.owner_id || emailChanged)) {
+    if (patch.owner_email && (!existing.owner_id || emailChanged || ownerPassword)) {
       try {
-        const { ownerId, credentials: creds } = await provisionOwnerAccount(patch.owner_email);
+        const { ownerId, credentials: creds } = await provisionOwnerAccount(patch.owner_email, ownerPassword);
         patch.owner_id = ownerId;
         credentials = creds;
       } catch (e) {
@@ -181,19 +186,18 @@ export const adminUpdateHotel = async (req, res) => {
 };
 
 // POST /api/admin/hotels/:id/reset-owner-password
-// Generates a fresh temp password for a hotel's existing owner account —
-// for when the one-time credentials box was closed before anyone copied it.
+// Generates a fresh temp password by default, or uses one passed in the body.
 export const resetOwnerPassword = async (req, res) => {
   try {
     const { data: hotel, error: hErr } = await supabase.from("hotels").select("owner_id, owner_email").eq("id", req.params.id).single();
     if (hErr) throw hErr;
     if (!hotel.owner_id) return res.status(400).json({ message: "This hotel has no owner account yet — set an owner_email and save to create one" });
 
-    const tempPassword = genTempPassword();
-    const { error } = await supabase.auth.admin.updateUserById(hotel.owner_id, { password: tempPassword });
+    const password = req.body?.password || genTempPassword();
+    const { error } = await supabase.auth.admin.updateUserById(hotel.owner_id, { password });
     if (error) throw error;
 
-    res.json({ email: hotel.owner_email, tempPassword });
+    res.json({ email: hotel.owner_email, tempPassword: password });
   } catch (error) {
     res.status(400).json({ message: error.message });
   }
@@ -222,8 +226,6 @@ export const adminGetBookings = async (req, res) => {
 };
 
 // GET /api/admin/bookings/owner/:owner_id
-// A hotel owner should only see bookings for hotels they own. We first find
-// their hotel IDs, then fetch bookings limited to those — never all bookings.
 export const hotelAdminGetBookings = async (req, res) => {
   try {
     const { owner_id } = req.params;
@@ -240,11 +242,8 @@ export const hotelAdminGetBookings = async (req, res) => {
 };
 
 // GET /api/admin/analytics
-// Computes dashboard figures in JS (small dataset, fine to aggregate in memory).
-// Only "confirmed" bookings count toward revenue; cancelled/pending are excluded.
 export const adminGetAnalytics = async (req, res) => {
   try {
-    // Pull just the columns we need from both tables in parallel
     const [bookingsRes, hotelsRes] = await Promise.all([
       supabase.from("bookings").select("total_price, created_at, status, nights, hotel_id"),
       supabase.from("hotels").select("id, name, city, tag"),
@@ -256,7 +255,6 @@ export const adminGetAnalytics = async (req, res) => {
 
     const totalRevenue = bookings.filter(b => b.status === "confirmed").reduce((sum, b) => sum + Number(b.total_price), 0);
 
-    // Build last 6 months of revenue (oldest -> newest) for the bar chart
     const now = new Date();
     const monthlyRevenue = [];
     for (let i = 5; i >= 0; i--) {
@@ -269,7 +267,6 @@ export const adminGetAnalytics = async (req, res) => {
       monthlyRevenue.push({ month, revenue });
     }
 
-    // Per-hotel booking counts + confirmed revenue, ranked high -> low
     const bookingsPerHotel = hotels.map(h => ({
       name: h.name, city: h.city,
       bookings: bookings.filter(b => b.hotel_id === h.id).length,
