@@ -4,6 +4,7 @@ import { Check, ArrowRight } from "lucide-react";
 import { theme } from "../lib/theme.js";
 import { api, paymentsApi } from "../lib/api.js";
 import { useAuth } from "../context/AuthContext.jsx";
+import { calculateGst } from "../lib/gst.js";
 
 function loadRazorpayScript() {
   if (window.Razorpay) return Promise.resolve(true);
@@ -47,7 +48,10 @@ export default function Booking() {
   const nights = form.check_in && form.check_out
     ? Math.max(0, Math.ceil((new Date(form.check_out) - new Date(form.check_in)) / (1000 * 60 * 60 * 24)))
     : 0;
-  const total = hotel && nights > 0 ? hotel.price * nights : 0;
+  const subtotal = hotel && nights > 0 ? hotel.price * nights : 0;
+  const { gstRate, gstAmount, grandTotal } = hotel && subtotal > 0
+    ? calculateGst(hotel.price, subtotal)
+    : { gstRate: 0, gstAmount: 0, grandTotal: 0 };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -117,6 +121,7 @@ export default function Booking() {
   if (error && !hotel) return <div style={{ padding: "120px 6vw", color: "#a33" }}>{error}</div>;
 
   if (confirmed) {
+    const confirmedTotal = confirmed.grand_total ?? confirmed.total_price;
     return (
       <main style={{ padding: "100px 6vw", minHeight: "70vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
         <div style={{ maxWidth: 560, textAlign: "center" }}>
@@ -137,8 +142,14 @@ export default function Booking() {
               <div><div style={{ color: theme.MUTED, fontSize: 11, letterSpacing: "0.15em", textTransform: "uppercase", marginBottom: 4 }}>Check-in</div>{confirmed.check_in}</div>
               <div><div style={{ color: theme.MUTED, fontSize: 11, letterSpacing: "0.15em", textTransform: "uppercase", marginBottom: 4 }}>Check-out</div>{confirmed.check_out}</div>
               <div style={{ gridColumn: "1 / -1", paddingTop: 16, borderTop: `1px solid ${theme.SAND}` }}>
-                <div style={{ color: theme.MUTED, fontSize: 11, letterSpacing: "0.15em", textTransform: "uppercase", marginBottom: 4 }}>Total</div>
-                <div className="serif" style={{ fontSize: 28, color: theme.SEA_DARK }}>₹{Number(confirmed.total_price).toLocaleString("en-IN")}</div>
+                {confirmed.gst_amount > 0 && (
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: theme.MUTED, marginBottom: 8 }}>
+                    <span>Room charge + GST ({confirmed.gst_rate}%)</span>
+                    <span>₹{Number(confirmed.total_price).toLocaleString("en-IN")} + ₹{Number(confirmed.gst_amount).toLocaleString("en-IN")}</span>
+                  </div>
+                )}
+                <div style={{ color: theme.MUTED, fontSize: 11, letterSpacing: "0.15em", textTransform: "uppercase", marginBottom: 4 }}>Total Paid</div>
+                <div className="serif" style={{ fontSize: 28, color: theme.SEA_DARK }}>₹{Number(confirmedTotal).toLocaleString("en-IN")}</div>
               </div>
             </div>
           </div>
@@ -247,11 +258,17 @@ export default function Booking() {
           <div style={{ paddingTop: 20, borderTop: `1px solid ${theme.SAND}`, display: "flex", flexDirection: "column", gap: 10, fontSize: 14 }}>
             <div style={{ display: "flex", justifyContent: "space-between" }}>
               <span style={{ color: theme.MUTED }}>₹{Number(hotel.price).toLocaleString("en-IN")} × {nights || 0} nights</span>
-              <span>₹{total.toLocaleString("en-IN")}</span>
+              <span>₹{subtotal.toLocaleString("en-IN")}</span>
             </div>
+            {gstRate > 0 && (
+              <div style={{ display: "flex", justifyContent: "space-between" }}>
+                <span style={{ color: theme.MUTED }}>GST ({gstRate}%)</span>
+                <span>₹{gstAmount.toLocaleString("en-IN")}</span>
+              </div>
+            )}
             <div style={{ display: "flex", justifyContent: "space-between", paddingTop: 16, borderTop: `1px solid ${theme.SAND}`, marginTop: 8 }}>
               <span style={{ fontWeight: 600 }}>Total</span>
-              <span className="serif" style={{ fontSize: 22, color: theme.SEA_DARK, fontWeight: 500 }}>₹{total.toLocaleString("en-IN")}</span>
+              <span className="serif" style={{ fontSize: 22, color: theme.SEA_DARK, fontWeight: 500 }}>₹{grandTotal.toLocaleString("en-IN")}</span>
             </div>
           </div>
         </aside>
