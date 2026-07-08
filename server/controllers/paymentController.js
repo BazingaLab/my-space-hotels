@@ -2,6 +2,7 @@ import { supabase } from "../config/supabase.js";
 import { createOrder as createRazorpayOrder, verifyPaymentSignature, verifyWebhookSignature } from "../config/razorpay.js";
 import { syncCustomerFromBooking } from "./customerController.js";
 import { creditBookingToWallet } from "./walletController.js";
+import { calculateGst } from "../utils/gst.js";
 
 // Shared with bookingController's pay-at-hotel flow — kept in sync manually
 // since there isn't a common "bookings" service module yet.
@@ -12,7 +13,11 @@ async function priceBooking({ hotel_id, check_in, check_out }) {
   const { data: hotel, error } = await supabase.from("hotels").select("price, name").eq("id", hotel_id).single();
   if (error || !hotel) throw new Error("Hotel not found");
 
-  return { nights, total_price: hotel.price * nights };
+  const total_price = hotel.price * nights;
+  // GST slab set by the hotel's nightly rate, applied to the whole stay.
+  const { gstRate, gstAmount, grandTotal } = calculateGst(hotel.price, total_price);
+
+  return { nights, total_price, gstRate, gstAmount, grandTotal };
 }
 
 // Runs the side effects a confirmed+paid booking needs. Safe to call more
@@ -24,14 +29,15 @@ async function onBookingConfirmed(booking) {
     if (customer) await supabase.from("bookings").update({ customer_id: customer.id }).eq("id", booking.id);
   } catch (e) { console.error("Customer sync failed:", e.message); }
 
-  try { await creditBookingToWallet(booking); }
+  try { await creditBookingToWallet(booking); } // still keys off pre-tax total_price
   catch (e) { console.error("Wallet credit failed:", e.message); }
 }
 
 // POST /api/payments/create-order
 // Creates a "pending" booking (not yet confirmed) + a matching Razorpay
 // order. The booking is only confirmed once /verify or the webhook proves
-// the payment actually went through.
+// the payment actually went through. The Razorpay order is for grand_total
+// (GST-inclusive) — that's the real amount charged to the guest's card.
 export const createOrderHandler = async (req, res) => {
   try {
     const { hotel_id, guest_name, guest_email, guest_phone, check_in, check_out, guests, user_id, special_request } = req.body;
@@ -39,18 +45,19 @@ export const createOrderHandler = async (req, res) => {
       return res.status(400).json({ message: "Missing required fields" });
     }
 
-    const { nights, total_price } = await priceBooking({ hotel_id, check_in, check_out });
+    const { nights, total_price, gstRate, gstAmount, grandTotal } = await priceBooking({ hotel_id, check_in, check_out });
 
     const { data: booking, error } = await supabase.from("bookings").insert([{
       hotel_id, guest_name, guest_email, guest_phone,
       check_in, check_out, guests: guests || 2, nights, total_price,
+      gst_rate: gstRate, gst_amount: gstAmount, grand_total: grandTotal,
       status: "pending", payment_mode: "prepaid", payment_status: "pending",
       special_request: special_request || null, user_id: user_id || null,
     }]).select().single();
     if (error) throw error;
 
     const order = await createRazorpayOrder({
-      amountRupees: total_price,
+      amountRupees: grandTotal,
       receipt: booking.id,
       notes: { booking_id: booking.id, hotel_id },
     });

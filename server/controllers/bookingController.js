@@ -1,6 +1,7 @@
 import { supabase } from "../config/supabase.js";
 import { syncCustomerFromBooking } from "./customerController.js";
 import { creditBookingToWallet } from "./walletController.js";
+import { calculateGst } from "../utils/gst.js";
 
 // POST /api/bookings
 export const createBooking = async (req, res) => {
@@ -24,6 +25,10 @@ export const createBooking = async (req, res) => {
     if (hotelError || !hotel) return res.status(404).json({ message: "Hotel not found" });
 
     const total_price = hotel.price * nights;
+    // GST slab is set by the hotel's nightly rate, applied to the whole stay.
+    // total_price stays pre-tax (wallet/commission base); grand_total is what
+    // the guest actually owes.
+    const { gstRate, gstAmount, grandTotal } = calculateGst(hotel.price, total_price);
 
     const { data, error } = await supabase
       .from("bookings")
@@ -38,6 +43,9 @@ export const createBooking = async (req, res) => {
           guests: guests || 2,
           nights,
           total_price,
+          gst_rate: gstRate,
+          gst_amount: gstAmount,
+          grand_total: grandTotal,
           status: "confirmed",
           user_id: user_id || null,
         },
@@ -56,7 +64,7 @@ export const createBooking = async (req, res) => {
       }
     } catch (e) { console.error("Customer sync failed:", e.message); }
 
-    // Credit hotel wallet (net of commission)
+    // Credit hotel wallet (net of commission) — still based on pre-tax total_price
     try { await creditBookingToWallet(data); }
     catch (e) { console.error("Wallet credit failed:", e.message); }
 
