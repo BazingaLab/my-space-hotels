@@ -50,28 +50,23 @@ export const approveHotel = async (req, res) => {
   try {
     const { id } = req.params;
 
-    // Get pending hotel
     const { data: pending, error: fetchError } = await supabase
       .from("pending_hotels").select("*").eq("id", id).single();
     if (fetchError) throw fetchError;
 
-    // Insert into hotels table
+    // Copy every submitted field across automatically, EXCLUDING only the
+    // handful that belong to pending_hotels' own bookkeeping (its id, review
+    // status/timestamps). This is deliberately not a hardcoded allow-list —
+    // an allow-list is exactly what silently dropped breakfast_available a
+    // moment ago. Any field that exists with the same name on both
+    // pending_hotels and hotels now carries through with zero code changes
+    // here, whenever either form grows.
+    const { id: _pendingId, status, submitted_at, reviewed_at, rejection_reason, ...hotelFields } = pending;
+
     const { data: hotel, error: insertError } = await supabase
       .from("hotels")
       .insert([{
-        name: pending.name,
-        city: pending.city,
-        state: pending.state,
-        country: pending.country,
-        description: pending.description,
-        short_description: pending.short_description,
-        cover_image: pending.cover_image,
-        images: pending.images,
-        price: pending.price,
-        tag: pending.tag,
-        amenities: pending.amenities,
-        rooms: pending.rooms,
-        owner_id: pending.owner_id,
+        ...hotelFields,
         featured: false,
         available: true,
         rating: 0,

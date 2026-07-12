@@ -3,14 +3,14 @@ import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext.jsx";
 import { pendingApi } from "../lib/api.js";
 import { theme } from "../lib/theme.js";
-import { ArrowRight, ArrowLeft, Check, Building2, FileText, ImageIcon, Eye, Upload } from "lucide-react";
+import { ArrowRight, ArrowLeft, Check, Building2, FileText, ImageIcon, Eye, Upload, Coffee } from "lucide-react";
 import { supabase } from "../lib/supabase.js";
 import AddressInput from "../shared/components/AddressInput.jsx";
 
 const TAGS = ["Heritage", "Beachfront", "Boutique", "Hotel", "Resort", "BnB"];
 const AMENITIES = ["WiFi", "Pool", "Spa", "Restaurant", "Bar", "Parking", "Gym", "Beach Access", "Room Service", "Laundry", "Airport Transfer", "Pet Friendly", "Fireplace", "Garden", "Rooftop", "Yoga Deck", "Bicycles", "Library", "Trekking", "Boat Tours"];
 
-const empty = { name: "", city: "", state: "", district: "", pincode: "", building: "", street: "", landmark: "", post_office: "", tag: "Boutique", description: "", short_description: "", amenities: [], rooms: 1, price: "", cover_image: "", images: "" };
+const empty = { name: "", city: "", state: "", district: "", pincode: "", building: "", street: "", landmark: "", post_office: "", tag: "Boutique", description: "", short_description: "", amenities: [], rooms: 1, price: "", cover_image: "", images: "", breakfast_available: false, breakfast_price: "" };
 
 export default function ListProperty() {
   const { user } = useAuth();
@@ -77,6 +77,8 @@ export default function ListProperty() {
         price: Number(form.price),
         rooms: Number(form.rooms),
         images: form.images ? form.images.split(",").map(s => s.trim()).filter(Boolean) : [],
+        breakfast_available: !!form.breakfast_available,
+        breakfast_price: form.breakfast_available ? Number(form.breakfast_price) || 0 : 0,
         owner_id: user.id,
         owner_email: user.email,
         owner_name: user.user_metadata?.full_name || "",
@@ -231,6 +233,22 @@ export default function ListProperty() {
               <input required type="number" min="500" style={{ ...inp, maxWidth: 240 }} placeholder="e.g. 12000" value={form.price} onChange={e => setForm({ ...form, price: e.target.value })} />
               <div style={{ fontSize: 12, color: theme.MUTED, marginTop: 6 }}>This is the base price. You can adjust it later from your dashboard.</div>
             </div>
+
+            <div style={{ padding: 20, border: `1px solid ${theme.SAND}`, background: "#fff" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: form.breakfast_available ? 14 : 0 }}>
+                <input type="checkbox" id="lp_breakfast" checked={form.breakfast_available} onChange={e => setForm({ ...form, breakfast_available: e.target.checked })} style={{ width: 16, height: 16, cursor: "pointer" }} />
+                <label htmlFor="lp_breakfast" style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14, cursor: "pointer" }}>
+                  <Coffee size={15} color={theme.SEA} /> Offer a "Room + Breakfast" option to guests
+                </label>
+              </div>
+              {form.breakfast_available && (
+                <div style={{ maxWidth: 260 }}>
+                  <label style={lbl}>Breakfast Surcharge (₹ / night)</label>
+                  <input type="number" min="0" style={inp} placeholder="e.g. 300" value={form.breakfast_price} onChange={e => setForm({ ...form, breakfast_price: e.target.value })} />
+                </div>
+              )}
+            </div>
+
             <div>
               <label style={lbl}>Cover Image *</label>
               <div
@@ -304,7 +322,7 @@ export default function ListProperty() {
                   {[
                     { label: "Price", value: form.price ? `₹${Number(form.price).toLocaleString("en-IN")}/night` : "—" },
                     { label: "Rooms", value: form.rooms },
-                    { label: "Amenities", value: `${form.amenities.length} selected` },
+                    { label: "Breakfast", value: form.breakfast_available ? `+₹${Number(form.breakfast_price || 0).toLocaleString("en-IN")}/night` : "Not offered" },
                   ].map(item => (
                     <div key={item.label} style={{ padding: 16, background: theme.SAND }}>
                       <div style={{ fontSize: 10, letterSpacing: "0.15em", color: theme.MUTED, textTransform: "uppercase", marginBottom: 4 }}>{item.label}</div>
