@@ -12,7 +12,6 @@ import {
   Users,
   BarChart3,
   LogOut,
-  Sparkles,
   ChevronRight,
   Wallet,
   ShieldAlert,
@@ -21,6 +20,7 @@ import {
 
 import { useAuth } from "../../context/AuthContext.jsx";
 import { useAdmin } from "../../context/AdminContext.jsx";
+import Logo from "../../components/Logo.jsx";
 
 import { theme } from "../../lib/theme.js";
 
@@ -273,55 +273,7 @@ export default function AdminLayout({
               "1px solid #2A3835",
           }}
         >
-          <Link
-            to="/"
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 10,
-              textDecoration: "none",
-              color: theme.CREAM,
-            }}
-          >
-            <div
-              style={{
-                width: 36,
-                height: 36,
-                borderRadius: "50%",
-                background: theme.SEA,
-                display: "grid",
-                placeItems: "center",
-              }}
-            >
-              <Sparkles size={16} />
-            </div>
-
-            <div>
-              <div
-                className="serif"
-                style={{
-                  fontSize: 18,
-                  fontWeight: 500,
-                  lineHeight: 1,
-                }}
-              >
-                My Space
-              </div>
-
-              <div
-                style={{
-                  fontSize: 8,
-                  letterSpacing: "0.3em",
-                  color: theme.SEA,
-                  marginTop: 2,
-                }}
-              >
-                {isAdmin
-                  ? "SUPER ADMIN"
-                  : "HOTEL ADMIN"}
-              </div>
-            </div>
-          </Link>
+          <Logo subtitle={isAdmin ? "SUPER ADMIN" : "HOTEL ADMIN"} subtitleColor={theme.SEA} chip />
         </div>
 
         {/* NAVIGATION */}
