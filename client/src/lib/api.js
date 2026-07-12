@@ -18,6 +18,7 @@ export const api = {
     return request(`/api/hotels${qs ? `?${qs}` : ""}`);
   },
   getHotelById: (id) => request(`/api/hotels/${id}`),
+  suggest: (q) => request(`/api/hotels/suggest?q=${encodeURIComponent(q)}`),
   getFeaturedHotels: () => request("/api/hotels/featured/list"),
   getPopularDestinations: () => request("/api/hotels/destinations/popular"),
   createBooking: (data) => request("/api/bookings", { method: "POST", body: JSON.stringify(data) }),

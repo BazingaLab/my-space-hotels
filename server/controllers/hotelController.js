@@ -83,6 +83,44 @@ export const getPopularDestinations = async (req, res) => {
   }
 };
 
+// GET /api/hotels/suggest?q=... — lightweight autocomplete for the search bar.
+// Searches hotel name, city, and pincode in one query; returns a short
+// ranked list split into direct hotel matches and deduplicated city matches.
+export const suggestHotels = async (req, res) => {
+  try {
+    const q = (req.query.q || "").trim();
+    if (q.length < 2) return res.json({ hotels: [], cities: [] });
+
+    const { data, error } = await supabase
+      .from("hotels")
+      .select("id, name, city, state, pincode")
+      .eq("available", true)
+      .or(`name.ilike.%${q}%,city.ilike.%${q}%,pincode.ilike.%${q}%`)
+      .limit(20);
+    if (error) throw error;
+
+    const qLower = q.toLowerCase();
+
+    // Hotels whose NAME matches — these navigate straight to the hotel
+    const hotels = data
+      .filter(h => h.name?.toLowerCase().includes(qLower))
+      .slice(0, 5)
+      .map(h => ({ id: h.id, name: h.name, city: h.city }));
+
+    // Cities matching by name or pincode — deduplicated, these run a city search
+    const cityMap = {};
+    data.forEach(h => {
+      const matches = h.city?.toLowerCase().includes(qLower) || h.pincode?.includes(q);
+      if (matches && h.city && !cityMap[h.city]) cityMap[h.city] = { city: h.city, state: h.state };
+    });
+    const cities = Object.values(cityMap).slice(0, 5);
+
+    res.json({ hotels, cities });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 // POST /api/hotels  (admin / seed)
 export const createHotel = async (req, res) => {
   try {
