@@ -3,17 +3,24 @@ import { Link } from "react-router-dom";
 import { Star, ArrowRight, Quote, Building2, CheckCircle2, MapPin, Calendar, Shield, BookOpen, ShieldCheck, Leaf, FileText } from "lucide-react";
 import { theme } from "../lib/theme.js";
 import { api } from "../lib/api.js";
+import { useAuth } from "../context/AuthContext.jsx";
 import SearchBar from "../components/SearchBar.jsx";
 import HotelCard from "../components/HotelCard.jsx";
 
 export default function Home() {
+  const { user } = useAuth();
   const [featured, setFeatured] = useState([]);
   const [destinations, setDestinations] = useState([]);
+  const [hotelCount, setHotelCount] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    Promise.all([api.getFeaturedHotels(), api.getPopularDestinations()])
-      .then(([f, d]) => { setFeatured(f.hotels || []); setDestinations(d.destinations || []); })
+    Promise.all([api.getFeaturedHotels(), api.getPopularDestinations(), api.getHotels()])
+      .then(([f, d, all]) => {
+        setFeatured(f.hotels || []);
+        setDestinations(d.destinations || []);
+        setHotelCount(typeof all.count === "number" ? all.count : null);
+      })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
@@ -45,9 +52,11 @@ export default function Home() {
               <Link to="/hotels" style={{ padding: "16px 32px", background: theme.SEA, color: theme.CREAM, textDecoration: "none", fontSize: 13, letterSpacing: "0.15em", textTransform: "uppercase", display: "inline-flex", alignItems: "center", gap: 10 }}>
                 Explore Hotels <ArrowRight size={14} />
               </Link>
-              <Link to="/login" style={{ fontSize: 13, color: theme.INK, textDecoration: "none", letterSpacing: "0.05em", borderBottom: `1px solid ${theme.INK}`, paddingBottom: 2 }}>
-                Sign in to book →
-              </Link>
+              {!user && (
+                <Link to="/login" style={{ fontSize: 13, color: theme.INK, textDecoration: "none", letterSpacing: "0.05em", borderBottom: `1px solid ${theme.INK}`, paddingBottom: 2 }}>
+                  Sign in to book →
+                </Link>
+              )}
             </div>
 
             {/* Trust strip */}
@@ -77,7 +86,7 @@ export default function Home() {
               <img src="https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?w=700&q=80" alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
             </div>
             <div className="serif" style={{ position: "absolute", bottom: "22%", right: "-2%", fontSize: 13, fontStyle: "italic", color: theme.SEA_DARK, background: theme.CREAM, padding: "10px 18px", border: `1px solid ${theme.SEA}33` }}>
-              ✦ 240+ properties across India
+              ✦ {hotelCount != null ? hotelCount : "…"} curated properties
             </div>
           </div>
         </div>
@@ -271,7 +280,7 @@ export default function Home() {
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             {[
-              { number: "7+", label: "Partner Hotels", sub: "and growing" },
+              { number: hotelCount != null ? `${hotelCount}+` : "—", label: "Partner Hotels", sub: "and growing" },
               { number: "₹0", label: "Setup Fee", sub: "free to list" },
               { number: "24h", label: "Review Time", sub: "fast onboarding" },
               { number: "100%", label: "Online", sub: "manage from anywhere" },
