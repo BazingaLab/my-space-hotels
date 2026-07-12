@@ -30,6 +30,10 @@ import MyBookings from "./pages/MyBookings.jsx";
 import BookingDetail from "./pages/BookingDetail.jsx";
 import AuthCallback from "./pages/hotel-portal/AuthCallback.jsx";
 import ListProperty from "./pages/ListProperty.jsx";
+import OurStory from "./pages/OurStory.jsx";
+import TrustSafety from "./pages/TrustSafety.jsx";
+import Sustainability from "./pages/Sustainability.jsx";
+import CancellationPolicy from "./pages/CancellationPolicy.jsx";
 
 /* =========================
    ADMIN PAGES
@@ -128,6 +132,11 @@ function AppRoutes() {
           path="/list-property"
           element={<ListProperty />}
         />
+
+        <Route path="/our-story" element={<OurStory />} />
+        <Route path="/trust-safety" element={<TrustSafety />} />
+        <Route path="/sustainability" element={<Sustainability />} />
+        <Route path="/cancellation-policy" element={<CancellationPolicy />} />
 
         {/* =========================
             AUTHENTICATED USER ROUTES
@@ -357,7 +366,6 @@ function AppRoutes() {
             </ProtectedRoute>
           }
         />
-
         <Route
           path="/hotel-portal/add-property"
           element={

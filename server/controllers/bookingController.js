@@ -12,6 +12,10 @@ export const createBooking = async (req, res) => {
       return res.status(400).json({ message: "Missing required fields" });
     }
 
+    if (check_in < new Date().toISOString().slice(0, 10)) {
+      return res.status(400).json({ message: "Check-in date cannot be in the past" });
+    }
+
     // Calculate nights & total
     const nights = Math.ceil((new Date(check_out) - new Date(check_in)) / (1000 * 60 * 60 * 24));
     if (nights < 1) return res.status(400).json({ message: "Check-out must be after check-in" });

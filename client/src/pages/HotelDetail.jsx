@@ -3,6 +3,7 @@ import { useParams, Link } from "react-router-dom";
 import { MapPin, Star, ArrowRight, Wifi, Coffee, Waves } from "lucide-react";
 import { theme } from "../lib/theme.js";
 import { api } from "../lib/api.js";
+import MapPreview from "../shared/components/MapPreview.jsx";
 
 export default function HotelDetail() {
   const { id } = useParams();
@@ -73,6 +74,15 @@ export default function HotelDetail() {
               </div>
             ))}
           </div>
+
+          {hotel.latitude && hotel.longitude && (
+            <>
+              <h3 className="serif" style={{ fontSize: 28, fontWeight: 400, marginBottom: 20 }}>Location</h3>
+              <div style={{ marginBottom: 40 }}>
+                <MapPreview latitude={hotel.latitude} longitude={hotel.longitude} />
+              </div>
+            </>
+          )}
         </div>
 
         {/* Booking sidebar */}
@@ -81,7 +91,7 @@ export default function HotelDetail() {
           <div className="serif" style={{ fontSize: 36, fontWeight: 500, color: theme.SEA_DARK, marginBottom: 4 }}>
             ₹{Number(hotel.price).toLocaleString("en-IN")}
           </div>
-          <div style={{ fontSize: 13, color: theme.MUTED, marginBottom: 28 }}>per night, taxes included</div>
+          <div style={{ fontSize: 13, color: theme.MUTED, marginBottom: 28 }}>per night, plus applicable GST</div>
 
           <Link to={`/book/${hotel.id}`} className="cta-btn" style={{
             display: "flex", justifyContent: "center", alignItems: "center", gap: 10,

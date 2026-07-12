@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { Sparkles, ArrowRight, Instagram, Facebook, Twitter } from "lucide-react";
 import { theme } from "../lib/theme.js";
 
@@ -7,6 +8,15 @@ export default function Footer() {
     { title: "Company", links: ["Our Story", "Press", "Careers", "Sustainability"] },
     { title: "Support", links: ["Help Centre", "Contact", "Cancellations", "Trust & Safety"] },
   ];
+
+  // Only the pages that actually exist get a real route — everything else
+  // in `cols` stays a "#" placeholder until those pages are built.
+  const routeMap = {
+    "Our Story": "/our-story",
+    "Sustainability": "/sustainability",
+    "Cancellations": "/cancellation-policy",
+    "Trust & Safety": "/trust-safety",
+  };
 
   return (
     <footer style={{ background: theme.INK, color: theme.CREAM, padding: "80px 6vw 32px" }}>
@@ -32,7 +42,9 @@ export default function Footer() {
         {cols.map(col => (
           <div key={col.title}>
             <div style={{ fontSize: 11, letterSpacing: "0.25em", color: theme.SEA, textTransform: "uppercase", marginBottom: 24, fontWeight: 600 }}>{col.title}</div>
-            {col.links.map(l => (
+            {col.links.map(l => routeMap[l] ? (
+              <Link key={l} to={routeMap[l]} className="link-underline" style={{ display: "block", color: "#C8D4D1", fontSize: 13, marginBottom: 14, textDecoration: "none", width: "fit-content" }}>{l}</Link>
+            ) : (
               <a key={l} href="#" className="link-underline" style={{ display: "block", color: "#C8D4D1", fontSize: 13, marginBottom: 14, textDecoration: "none", width: "fit-content" }}>{l}</a>
             ))}
           </div>

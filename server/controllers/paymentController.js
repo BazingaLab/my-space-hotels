@@ -7,6 +7,8 @@ import { calculateGst } from "../utils/gst.js";
 // Shared with bookingController's pay-at-hotel flow — kept in sync manually
 // since there isn't a common "bookings" service module yet.
 async function priceBooking({ hotel_id, check_in, check_out }) {
+  if (check_in < new Date().toISOString().slice(0, 10)) throw new Error("Check-in date cannot be in the past");
+
   const nights = Math.ceil((new Date(check_out) - new Date(check_in)) / (1000 * 60 * 60 * 24));
   if (nights < 1) throw new Error("Check-out must be after check-in");
 

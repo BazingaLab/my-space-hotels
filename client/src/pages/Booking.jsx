@@ -17,6 +17,8 @@ function loadRazorpayScript() {
   });
 }
 
+const todayStr = () => new Date().toISOString().slice(0, 10);
+
 export default function Booking() {
   const { id } = useParams();
   const { user } = useAuth();
@@ -53,9 +55,24 @@ export default function Booking() {
     ? calculateGst(hotel.price, subtotal)
     : { gstRate: 0, gstAmount: 0, grandTotal: 0 };
 
+  const handleCheckInChange = (value) => {
+    setForm(f => ({
+      ...f,
+      check_in: value,
+      // Clear check-out if it's no longer after the new check-in
+      check_out: f.check_out && f.check_out <= value ? "" : f.check_out,
+    }));
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError(null);
+
+    if (form.check_in < todayStr()) {
+      setError("Check-in date can't be in the past.");
+      return;
+    }
+
     setSubmitting(true);
     try {
       if (paymentMode === "pay_at_hotel") {
@@ -197,11 +214,11 @@ export default function Booking() {
           <div className="grid-1-mobile" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16 }}>
             <div>
               <label style={labelStyle}>Check-in</label>
-              <input required type="date" style={fieldStyle} value={form.check_in} onChange={e => setForm({...form, check_in: e.target.value})} />
+              <input required type="date" min={todayStr()} style={fieldStyle} value={form.check_in} onChange={e => handleCheckInChange(e.target.value)} />
             </div>
             <div>
               <label style={labelStyle}>Check-out</label>
-              <input required type="date" style={fieldStyle} value={form.check_out} onChange={e => setForm({...form, check_out: e.target.value})} />
+              <input required type="date" min={form.check_in || todayStr()} style={fieldStyle} value={form.check_out} onChange={e => setForm({...form, check_out: e.target.value})} />
             </div>
             <div>
               <label style={labelStyle}>Guests</label>

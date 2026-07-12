@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { Star, ArrowRight, Quote, Building2, CheckCircle2, MapPin, Calendar, Shield } from "lucide-react";
+import { Star, ArrowRight, Quote, Building2, CheckCircle2, MapPin, Calendar, Shield, BookOpen, ShieldCheck, Leaf, FileText } from "lucide-react";
 import { theme } from "../lib/theme.js";
 import { api } from "../lib/api.js";
 import SearchBar from "../components/SearchBar.jsx";
@@ -211,6 +211,31 @@ export default function Home() {
                   </div>
                 </div>
               </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── TRUST & POLICIES ── */}
+      <section style={{ padding: "80px 6vw 100px", background: "#fff", borderTop: `1px solid ${theme.SAND}` }}>
+        <div style={{ maxWidth: 1280, margin: "0 auto" }}>
+          <div style={{ textAlign: "center", marginBottom: 56 }}>
+            <div style={{ fontSize: 11, letterSpacing: "0.3em", color: theme.SEA_DARK, marginBottom: 12, textTransform: "uppercase" }}>Know Us Better</div>
+            <h2 className="serif" style={{ fontSize: "clamp(32px, 4vw, 52px)", fontWeight: 400, color: theme.INK }}>Booking with confidence.</h2>
+          </div>
+          <div className="grid-1-mobile" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 24 }}>
+            {[
+              { icon: BookOpen, title: "Our Story", desc: "Why we started, and what we stand for.", link: "/our-story" },
+              { icon: ShieldCheck, title: "Trust & Safety", desc: "Our commitment to every guest's safety and comfort.", link: "/trust-safety" },
+              { icon: Leaf, title: "Sustainability", desc: "Building hospitality with purpose, together with EDU.", link: "/sustainability" },
+              { icon: FileText, title: "Cancellation & Refunds", desc: "Clear terms, fair to guests and partners alike.", link: "/cancellation-policy" },
+            ].map(c => (
+              <Link key={c.title} to={c.link} style={{ textDecoration: "none", color: theme.INK, background: theme.CREAM, border: `1px solid ${theme.SAND}`, padding: 28, display: "block" }}>
+                <c.icon size={22} color={theme.SEA} style={{ marginBottom: 16 }} />
+                <div className="serif" style={{ fontSize: 19, fontWeight: 500, marginBottom: 8 }}>{c.title}</div>
+                <div style={{ fontSize: 13, color: theme.MUTED, lineHeight: 1.6, marginBottom: 14 }}>{c.desc}</div>
+                <div style={{ fontSize: 12, color: theme.SEA_DARK, display: "flex", alignItems: "center", gap: 6 }}>Read more <ArrowRight size={12} /></div>
+              </Link>
             ))}
           </div>
         </div>
