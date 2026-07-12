@@ -2,7 +2,8 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext.jsx";
 import { theme } from "../../lib/theme.js";
-import { Sparkles, Mail, Lock, ArrowRight, Shield, Eye, EyeOff } from "lucide-react";
+import Logo from "../../components/Logo.jsx";
+import { Mail, Lock, ArrowRight, Shield, Eye, EyeOff } from "lucide-react";
 
 export default function AdminLogin() {
   const { signIn, signOut } = useAuth();
@@ -75,14 +76,8 @@ export default function AdminLogin() {
       <div style={{ background: theme.CREAM, width: "100%", maxWidth: 420, padding: 48 }}>
 
         {/* LOGO */}
-        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 40 }}>
-          <div style={{ width: 40, height: 40, borderRadius: "50%", background: theme.SEA, display: "grid", placeItems: "center", color: theme.CREAM }}>
-            <Sparkles size={18} />
-          </div>
-          <div>
-            <div className="serif" style={{ fontSize: 20, fontWeight: 500, lineHeight: 1 }}>My Space Hotels</div>
-            <div style={{ fontSize: 9, letterSpacing: "0.3em", color: theme.SEA_DARK, marginTop: 2 }}>ADMIN PORTAL</div>
-          </div>
+        <div style={{ marginBottom: 40 }}>
+          <Logo subtitle="ADMIN PORTAL" subtitleColor={theme.SEA_DARK} />
         </div>
 
         {/* HEADER */}
