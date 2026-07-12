@@ -3,7 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext.jsx";
 import { theme } from "../lib/theme.js";
 import Logo from "../components/Logo.jsx";
-import { Mail, Lock, User, ArrowRight } from "lucide-react";
+import { Mail, Lock, User, ArrowRight, Eye, EyeOff } from "lucide-react";
 
 export default function Signup() {
   const { signUp, signInWithGoogle } = useAuth();
@@ -13,6 +13,7 @@ export default function Signup() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -158,7 +159,14 @@ export default function Signup() {
               <label style={labelStyle}>Password</label>
               <div style={{ position: "relative" }}>
                 <Lock size={16} color={theme.MUTED} style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)" }} />
-                <input required type="password" style={fieldStyle} placeholder="Min. 6 characters" value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} />
+                <input required type={showPassword ? "text" : "password"} style={{ ...fieldStyle, paddingRight: 44 }} placeholder="Min. 6 characters" value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(s => !s)}
+                  style={{ position: "absolute", right: 14, top: "50%", transform: "translateY(-50%)", background: "transparent", border: "none", cursor: "pointer", color: theme.MUTED, display: "flex", alignItems: "center", padding: 0 }}
+                >
+                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
               </div>
             </div>
 
@@ -166,7 +174,14 @@ export default function Signup() {
               <label style={labelStyle}>Confirm Password</label>
               <div style={{ position: "relative" }}>
                 <Lock size={16} color={theme.MUTED} style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)" }} />
-                <input required type="password" style={fieldStyle} placeholder="Repeat your password" value={form.confirm} onChange={e => setForm({ ...form, confirm: e.target.value })} />
+                <input required type={showPassword ? "text" : "password"} style={{ ...fieldStyle, paddingRight: 44 }} placeholder="Repeat your password" value={form.confirm} onChange={e => setForm({ ...form, confirm: e.target.value })} />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(s => !s)}
+                  style={{ position: "absolute", right: 14, top: "50%", transform: "translateY(-50%)", background: "transparent", border: "none", cursor: "pointer", color: theme.MUTED, display: "flex", alignItems: "center", padding: 0 }}
+                >
+                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
               </div>
             </div>
 
