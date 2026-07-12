@@ -2,7 +2,8 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext.jsx";
 import { theme } from "../lib/theme.js";
-import { Sparkles, Mail, Lock, User, ArrowRight } from "lucide-react";
+import Logo from "../components/Logo.jsx";
+import { Mail, Lock, User, ArrowRight } from "lucide-react";
 
 export default function Signup() {
   const { signUp, signInWithGoogle } = useAuth();
@@ -86,14 +87,8 @@ export default function Signup() {
       <div style={{ background: theme.INK, padding: "80px 60px", display: "flex", flexDirection: "column", justifyContent: "space-between", position: "relative", overflow: "hidden" }} className="hide-mobile">
         <div style={{ position: "absolute", right: -60, top: -60, width: 300, height: 300, border: "1px solid #2A3835", borderRadius: "50%" }} />
         <div style={{ position: "absolute", left: -80, bottom: -80, width: 400, height: 400, border: "1px solid #2A3835", borderRadius: "50%" }} />
-        <div style={{ display: "flex", alignItems: "center", gap: 10, position: "relative" }}>
-          <div style={{ width: 36, height: 36, borderRadius: "50%", background: theme.SEA, display: "grid", placeItems: "center", color: theme.CREAM }}>
-            <Sparkles size={16} />
-          </div>
-          <div>
-            <div className="serif" style={{ fontSize: 20, fontWeight: 500, color: theme.CREAM, lineHeight: 1 }}>My Space</div>
-            <div style={{ fontSize: 9, letterSpacing: "0.3em", color: theme.SEA, marginTop: 2 }}>HOTELS</div>
-          </div>
+        <div style={{ position: "relative" }}>
+          <Logo subtitle="HOTELS" subtitleColor={theme.SEA} chip />
         </div>
         <div style={{ position: "relative" }}>
           <h2 className="serif" style={{ fontSize: 52, fontWeight: 400, color: theme.CREAM, lineHeight: 1.1, marginBottom: 20 }}>

@@ -2,7 +2,8 @@ import { Link, useLocation, useNavigate, Navigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext.jsx";
 import { useHotelPortal } from "../../context/HotelPortalContext.jsx";
 import { theme } from "../../lib/theme.js";
-import { LayoutDashboard, Building2, Image, CalendarCheck, Wallet, LogOut, Sparkles, ChevronRight, ExternalLink, PlusCircle, Check, ShieldCheck } from "lucide-react";
+import Logo from "../../components/Logo.jsx";
+import { LayoutDashboard, Building2, Image, CalendarCheck, Wallet, LogOut, ChevronRight, ExternalLink, PlusCircle, Check, ShieldCheck } from "lucide-react";
 
 const navItems = [
   { path: "/hotel-portal", label: "Dashboard", icon: LayoutDashboard },
@@ -68,15 +69,7 @@ export default function HotelPortalLayout({ children }) {
       }}>
         {/* Logo */}
         <div style={{ padding: "32px 24px", borderBottom: "1px solid rgba(255,255,255,0.1)" }}>
-          <Link to="/" style={{ display: "flex", alignItems: "center", gap: 10, textDecoration: "none", color: theme.CREAM }}>
-            <div style={{ width: 36, height: 36, borderRadius: "50%", background: "rgba(255,255,255,0.15)", display: "grid", placeItems: "center" }}>
-              <Sparkles size={16} />
-            </div>
-            <div>
-              <div className="serif" style={{ fontSize: 18, fontWeight: 500, lineHeight: 1 }}>My Space</div>
-              <div style={{ fontSize: 8, letterSpacing: "0.3em", color: "rgba(255,255,255,0.6)", marginTop: 2 }}>HOTEL PORTAL</div>
-            </div>
-          </Link>
+          <Logo chip subtitle="HOTEL PORTAL" subtitleColor="rgba(255,255,255,0.6)" />
         </div>
 
         {/* Property switcher */}

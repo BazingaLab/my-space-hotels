@@ -2,7 +2,8 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext.jsx";
 import { theme } from "../../lib/theme.js";
-import { Building2, Mail, Lock, ArrowRight, Eye, EyeOff } from "lucide-react";
+import Logo from "../../components/Logo.jsx";
+import { Mail, Lock, ArrowRight, Eye, EyeOff } from "lucide-react";
 
 export default function HotelPortalLogin() {
   const { signIn, signOut } = useAuth();
@@ -75,14 +76,8 @@ export default function HotelPortalLogin() {
         <div style={{ position: "absolute", left: -80, bottom: -80, width: 400, height: 400, border: "1px solid rgba(255,255,255,0.05)", borderRadius: "50%" }} />
 
         {/* LOGO */}
-        <div style={{ display: "flex", alignItems: "center", gap: 10, position: "relative" }}>
-          <div style={{ width: 40, height: 40, borderRadius: "50%", background: "rgba(255,255,255,0.15)", display: "grid", placeItems: "center", color: theme.CREAM }}>
-            <Building2 size={20} />
-          </div>
-          <div>
-            <div className="serif" style={{ fontSize: 20, fontWeight: 500, color: theme.CREAM, lineHeight: 1 }}>My Space Hotels</div>
-            <div style={{ fontSize: 9, letterSpacing: "0.3em", color: "rgba(255,255,255,0.5)", marginTop: 2 }}>HOTEL PARTNER PORTAL</div>
-          </div>
+        <div style={{ position: "relative" }}>
+          <Logo subtitle="HOTEL PARTNER PORTAL" subtitleColor="rgba(255,255,255,0.5)" chip />
         </div>
 
         {/* CONTENT */}

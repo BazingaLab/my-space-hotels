@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
-import { Sparkles, ArrowRight, Instagram, Facebook, Twitter } from "lucide-react";
+import { ArrowRight, Instagram, Facebook, Twitter } from "lucide-react";
 import { theme } from "../lib/theme.js";
+import Logo from "./Logo.jsx";
 
 export default function Footer() {
   const cols = [
@@ -25,14 +26,8 @@ export default function Footer() {
         gap: 60, paddingBottom: 60, borderBottom: "1px solid #2A3835",
       }}>
         <div>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 20 }}>
-            <div style={{ width: 36, height: 36, borderRadius: "50%", background: theme.SEA, display: "grid", placeItems: "center" }}>
-              <Sparkles size={16} />
-            </div>
-            <div>
-              <div className="serif" style={{ fontSize: 22, fontWeight: 500, lineHeight: 1 }}>My Space</div>
-              <div style={{ fontSize: 9, letterSpacing: "0.3em", color: theme.SEA, marginTop: 2 }}>HOTELS</div>
-            </div>
+          <div style={{ marginBottom: 20 }}>
+            <Logo subtitle="HOTELS" subtitleColor={theme.SEA} chip />
           </div>
           <p style={{ fontSize: 13, lineHeight: 1.7, color: "#8A9994", maxWidth: 280, fontWeight: 300 }}>
             A curated collection of independent hotels and retreats, chosen for their soul, not their stars.
