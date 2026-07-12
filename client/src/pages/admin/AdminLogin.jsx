@@ -21,11 +21,14 @@ export default function AdminLogin() {
       // Step 1: Sign in — signIn returns data directly (not { user })
       const data = await signIn(form.email, form.password);
       const userId = data?.user?.id;
+      const token = data?.session?.access_token;
       if (!userId) throw new Error("Authentication failed");
 
-      // Step 2: Check role via backend API (bypasses RLS)
+      // Step 2: Check role via backend API — must send the fresh session
+      // token, since this route now requires a verified login.
       const res = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/admin/role/${userId}`
+        `${import.meta.env.VITE_API_URL}/api/admin/role/${userId}`,
+        { headers: token ? { Authorization: `Bearer ${token}` } : {} }
       );
       if (!res.ok) throw new Error("Unable to verify admin role");
       const roleData = await res.json();
