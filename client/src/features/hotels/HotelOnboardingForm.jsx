@@ -3,8 +3,9 @@ import { theme } from "../../lib/theme.js";
 import { adminApi, walletsApi } from "../../lib/api.js";
 import { useAuth } from "../../context/AuthContext.jsx";
 import { supabase } from "../../lib/supabase.js";
-import { Save, Building2, User, FileText, MapPin, Clock, IndianRupee, Landmark, Upload, Image as ImageIcon, KeyRound, Star } from "lucide-react";
+import { Save, Building2, User, FileText, MapPin, Clock, IndianRupee, Landmark, Upload, Image as ImageIcon, KeyRound, Star, Coffee } from "lucide-react";
 import AddressInput from "../../shared/components/AddressInput.jsx";
+import LocationPicker from "../../shared/components/LocationPicker.jsx";
 
 const HOTEL_TYPES = ["Budget", "Premium", "Resort"];
 const TAGS = ["Heritage", "Beachfront", "Boutique", "Hotel", "Resort", "BnB"];
@@ -19,6 +20,8 @@ const empty = {
   bank_account_name: "", bank_account_number: "", bank_ifsc: "", bank_name: "",
   referred_by_name: "",
   building: "", street: "", landmark: "", district: "", post_office: "",
+  latitude: null, longitude: null,
+  breakfast_available: false, breakfast_price: 0,
 };
 
 const inp = { width: "100%", padding: "11px 14px", border: `1px solid ${theme.SAND}`, background: "#fff", fontSize: 14, color: theme.INK, outline: "none", fontFamily: "Inter, sans-serif", boxSizing: "border-box" };
@@ -85,14 +88,14 @@ export default function HotelOnboardingForm({ initial = null, onSaved }) {
 
   const submit = async (e) => {
     e.preventDefault();
-    setError(null); setOk(false); setOwnerCreds(null);
+    setSaving(true); setError(null); setOk(false); setOwnerCreds(null);
 
     if (f.owner_password && f.owner_password.trim().length < 6) {
       setError("Owner password must be at least 6 characters — or leave it blank to auto-generate one.");
+      setSaving(false);
       return;
     }
 
-    setSaving(true);
     try {
       const payload = {
         name: f.name, hotel_type: f.hotel_type, owner_name: f.owner_name, contact_number: f.contact_number,
@@ -107,6 +110,9 @@ export default function HotelOnboardingForm({ initial = null, onSaved }) {
         agreement_start_date: f.agreement_start_date || null, agreement_end_date: f.agreement_end_date || null,
         commission_percent: Number(f.commission_percent),
         bank_details: { bank_account_name: f.bank_account_name, bank_account_number: f.bank_account_number, bank_ifsc: f.bank_ifsc, bank_name: f.bank_name },
+        latitude: f.latitude ?? null, longitude: f.longitude ?? null,
+        breakfast_available: !!f.breakfast_available,
+        breakfast_price: Number(f.breakfast_price) || 0,
       };
       if (f.owner_password && f.owner_password.trim()) {
         payload.owner_password = f.owner_password.trim();
@@ -150,6 +156,20 @@ export default function HotelOnboardingForm({ initial = null, onSaved }) {
         <div style={{ ...grid2, marginTop: 16 }}>
           <Field label="Total Rooms" k="rooms" type="number" f={f} set={set} />
           <Field label="Price / Night (₹)" k="price" type="number" req f={f} set={set} />
+        </div>
+
+        <div style={{ marginTop: 16, padding: 16, border: `1px solid ${theme.SAND}`, background: theme.CREAM }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: f.breakfast_available ? 14 : 0 }}>
+            <input type="checkbox" id="breakfastAvailable" checked={f.breakfast_available} onChange={e => set("breakfast_available", e.target.checked)} style={{ width: 16, height: 16, cursor: "pointer" }} />
+            <label htmlFor="breakfastAvailable" style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14, cursor: "pointer" }}>
+              <Coffee size={15} color={theme.SEA} /> Offer a "Room + Breakfast" option to guests
+            </label>
+          </div>
+          {f.breakfast_available && (
+            <div style={{ maxWidth: 260 }}>
+              <Field label="Breakfast Surcharge (₹ / night)" k="breakfast_price" type="number" ph="e.g. 300" f={f} set={set} />
+            </div>
+          )}
         </div>
 
         <div style={{ marginTop: 16 }}>
@@ -232,6 +252,14 @@ export default function HotelOnboardingForm({ initial = null, onSaved }) {
           onChange={addr => setF(s => ({ ...s, ...addr }))}
         />
         <div style={{ marginTop: 16 }}><Field label="Google Map Link" k="google_map_link" ph="https://maps.google.com/..." f={f} set={set} /></div>
+        <div style={{ marginTop: 16 }}>
+          <LocationPicker
+            latitude={f.latitude}
+            longitude={f.longitude}
+            onChange={(lat, lng) => setF(s => ({ ...s, latitude: lat, longitude: lng }))}
+            addressHint={[f.building, f.street, f.landmark, f.city, f.district, f.state, f.pincode].filter(Boolean).join(", ")}
+          />
+        </div>
       </Section>
 
       <Section icon={Clock} title="Timings & Amenities">

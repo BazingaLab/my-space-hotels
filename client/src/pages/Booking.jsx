@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
-import { Check, ArrowRight } from "lucide-react";
+import { Check, ArrowRight, Coffee } from "lucide-react";
 import { theme } from "../lib/theme.js";
 import { api, paymentsApi } from "../lib/api.js";
 import { useAuth } from "../context/AuthContext.jsx";
@@ -27,6 +27,7 @@ export default function Booking() {
     guest_name: "", guest_email: "", guest_phone: "",
     check_in: "", check_out: "", guests: 2,
   });
+  const [mealPlan, setMealPlan] = useState("room_only");
   const [paymentMode, setPaymentMode] = useState("pay_at_hotel");
   const [submitting, setSubmitting] = useState(false);
   const [confirmed, setConfirmed] = useState(null);
@@ -50,9 +51,14 @@ export default function Booking() {
   const nights = form.check_in && form.check_out
     ? Math.max(0, Math.ceil((new Date(form.check_out) - new Date(form.check_in)) / (1000 * 60 * 60 * 24)))
     : 0;
-  const subtotal = hotel && nights > 0 ? hotel.price * nights : 0;
+
+  const breakfastPerNight = hotel?.breakfast_available && mealPlan === "breakfast_included" ? Number(hotel.breakfast_price || 0) : 0;
+  const nightlyRate = hotel ? Number(hotel.price) + breakfastPerNight : 0;
+  const roomSubtotal = hotel && nights > 0 ? Number(hotel.price) * nights : 0;
+  const breakfastSubtotal = nights > 0 ? breakfastPerNight * nights : 0;
+  const subtotal = roomSubtotal + breakfastSubtotal;
   const { gstRate, gstAmount, grandTotal } = hotel && subtotal > 0
-    ? calculateGst(hotel.price, subtotal)
+    ? calculateGst(nightlyRate, subtotal)
     : { gstRate: 0, gstAmount: 0, grandTotal: 0 };
 
   const handleCheckInChange = (value) => {
@@ -75,15 +81,17 @@ export default function Booking() {
 
     setSubmitting(true);
     try {
+      const bookingPayload = { hotel_id: id, ...form, guests: Number(form.guests), user_id: user?.id || null, meal_plan: mealPlan };
+
       if (paymentMode === "pay_at_hotel") {
-        const res = await api.createBooking({ hotel_id: id, ...form, guests: Number(form.guests), user_id: user?.id || null });
+        const res = await api.createBooking(bookingPayload);
         setConfirmed(res.booking);
         setSubmitting(false);
         return;
       }
 
       // Prepaid: create a Razorpay order first, then open Checkout.
-      const order = await paymentsApi.createOrder({ hotel_id: id, ...form, guests: Number(form.guests), user_id: user?.id || null });
+      const order = await paymentsApi.createOrder(bookingPayload);
 
       const scriptReady = await loadRazorpayScript();
       if (!scriptReady || !window.Razorpay) {
@@ -158,10 +166,11 @@ export default function Booking() {
               <div><div style={{ color: theme.MUTED, fontSize: 11, letterSpacing: "0.15em", textTransform: "uppercase", marginBottom: 4 }}>Guests</div>{confirmed.guests}</div>
               <div><div style={{ color: theme.MUTED, fontSize: 11, letterSpacing: "0.15em", textTransform: "uppercase", marginBottom: 4 }}>Check-in</div>{confirmed.check_in}</div>
               <div><div style={{ color: theme.MUTED, fontSize: 11, letterSpacing: "0.15em", textTransform: "uppercase", marginBottom: 4 }}>Check-out</div>{confirmed.check_out}</div>
+              <div><div style={{ color: theme.MUTED, fontSize: 11, letterSpacing: "0.15em", textTransform: "uppercase", marginBottom: 4 }}>Meal Plan</div>{confirmed.meal_plan === "breakfast_included" ? "Room + Breakfast" : "Room Only"}</div>
               <div style={{ gridColumn: "1 / -1", paddingTop: 16, borderTop: `1px solid ${theme.SAND}` }}>
                 {confirmed.gst_amount > 0 && (
                   <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: theme.MUTED, marginBottom: 8 }}>
-                    <span>Room charge + GST ({confirmed.gst_rate}%)</span>
+                    <span>Room{confirmed.meal_plan === "breakfast_included" ? " + breakfast" : ""} charge + GST ({confirmed.gst_rate}%)</span>
                     <span>₹{Number(confirmed.total_price).toLocaleString("en-IN")} + ₹{Number(confirmed.gst_amount).toLocaleString("en-IN")}</span>
                   </div>
                 )}
@@ -228,6 +237,35 @@ export default function Booking() {
             </div>
           </div>
 
+          {hotel.breakfast_available && (
+            <div>
+              <label style={labelStyle}>Meal Plan</label>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                {[
+                  { value: "room_only", label: "Room Only", hint: "Just the stay" },
+                  { value: "breakfast_included", label: "Room + Breakfast", hint: `+₹${Number(hotel.breakfast_price).toLocaleString("en-IN")}/night` },
+                ].map(opt => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => setMealPlan(opt.value)}
+                    style={{
+                      textAlign: "left", padding: "14px 16px", cursor: "pointer",
+                      border: `1px solid ${mealPlan === opt.value ? theme.SEA : theme.SAND}`,
+                      background: mealPlan === opt.value ? "#fff" : "transparent",
+                      boxShadow: mealPlan === opt.value ? `inset 0 0 0 1px ${theme.SEA}` : "none",
+                    }}
+                  >
+                    <div style={{ fontSize: 14, fontWeight: 600, color: mealPlan === opt.value ? theme.SEA_DARK : theme.INK, display: "flex", alignItems: "center", gap: 6 }}>
+                      {opt.value === "breakfast_included" && <Coffee size={13} />} {opt.label}
+                    </div>
+                    <div style={{ fontSize: 12, color: theme.MUTED, marginTop: 2 }}>{opt.hint}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div>
             <label style={labelStyle}>Payment</label>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
@@ -275,8 +313,14 @@ export default function Booking() {
           <div style={{ paddingTop: 20, borderTop: `1px solid ${theme.SAND}`, display: "flex", flexDirection: "column", gap: 10, fontSize: 14 }}>
             <div style={{ display: "flex", justifyContent: "space-between" }}>
               <span style={{ color: theme.MUTED }}>₹{Number(hotel.price).toLocaleString("en-IN")} × {nights || 0} nights</span>
-              <span>₹{subtotal.toLocaleString("en-IN")}</span>
+              <span>₹{roomSubtotal.toLocaleString("en-IN")}</span>
             </div>
+            {breakfastSubtotal > 0 && (
+              <div style={{ display: "flex", justifyContent: "space-between" }}>
+                <span style={{ color: theme.MUTED, display: "flex", alignItems: "center", gap: 6 }}><Coffee size={12} /> Breakfast × {nights} nights</span>
+                <span>₹{breakfastSubtotal.toLocaleString("en-IN")}</span>
+              </div>
+            )}
             {gstRate > 0 && (
               <div style={{ display: "flex", justifyContent: "space-between" }}>
                 <span style={{ color: theme.MUTED }}>GST ({gstRate}%)</span>

@@ -6,20 +6,28 @@ import { calculateGst } from "../utils/gst.js";
 
 // Shared with bookingController's pay-at-hotel flow — kept in sync manually
 // since there isn't a common "bookings" service module yet.
-async function priceBooking({ hotel_id, check_in, check_out }) {
+async function priceBooking({ hotel_id, check_in, check_out, meal_plan }) {
   if (check_in < new Date().toISOString().slice(0, 10)) throw new Error("Check-in date cannot be in the past");
 
   const nights = Math.ceil((new Date(check_out) - new Date(check_in)) / (1000 * 60 * 60 * 24));
   if (nights < 1) throw new Error("Check-out must be after check-in");
 
-  const { data: hotel, error } = await supabase.from("hotels").select("price, name").eq("id", hotel_id).single();
+  const { data: hotel, error } = await supabase.from("hotels").select("price, name, breakfast_available, breakfast_price").eq("id", hotel_id).single();
   if (error || !hotel) throw new Error("Hotel not found");
 
-  const total_price = hotel.price * nights;
-  // GST slab set by the hotel's nightly rate, applied to the whole stay.
-  const { gstRate, gstAmount, grandTotal } = calculateGst(hotel.price, total_price);
+  const wantsBreakfast = meal_plan === "breakfast_included" && hotel.breakfast_available;
+  const breakfastPricePerNight = wantsBreakfast ? Number(hotel.breakfast_price || 0) : 0;
+  const nightlyRate = Number(hotel.price) + breakfastPricePerNight;
 
-  return { nights, total_price, gstRate, gstAmount, grandTotal };
+  const total_price = nightlyRate * nights;
+  // GST slab set by the hotel's effective nightly rate, applied to the whole stay.
+  const { gstRate, gstAmount, grandTotal } = calculateGst(nightlyRate, total_price);
+
+  return {
+    nights, total_price, gstRate, gstAmount, grandTotal,
+    mealPlan: wantsBreakfast ? "breakfast_included" : "room_only",
+    breakfastPricePerNight,
+  };
 }
 
 // Runs the side effects a confirmed+paid booking needs. Safe to call more
@@ -42,17 +50,18 @@ async function onBookingConfirmed(booking) {
 // (GST-inclusive) — that's the real amount charged to the guest's card.
 export const createOrderHandler = async (req, res) => {
   try {
-    const { hotel_id, guest_name, guest_email, guest_phone, check_in, check_out, guests, user_id, special_request } = req.body;
+    const { hotel_id, guest_name, guest_email, guest_phone, check_in, check_out, guests, user_id, special_request, meal_plan } = req.body;
     if (!hotel_id || !guest_name || !guest_email || !check_in || !check_out) {
       return res.status(400).json({ message: "Missing required fields" });
     }
 
-    const { nights, total_price, gstRate, gstAmount, grandTotal } = await priceBooking({ hotel_id, check_in, check_out });
+    const { nights, total_price, gstRate, gstAmount, grandTotal, mealPlan, breakfastPricePerNight } = await priceBooking({ hotel_id, check_in, check_out, meal_plan });
 
     const { data: booking, error } = await supabase.from("bookings").insert([{
       hotel_id, guest_name, guest_email, guest_phone,
       check_in, check_out, guests: guests || 2, nights, total_price,
       gst_rate: gstRate, gst_amount: gstAmount, grand_total: grandTotal,
+      meal_plan: mealPlan, breakfast_price_applied: breakfastPricePerNight,
       status: "pending", payment_mode: "prepaid", payment_status: "pending",
       special_request: special_request || null, user_id: user_id || null,
     }]).select().single();

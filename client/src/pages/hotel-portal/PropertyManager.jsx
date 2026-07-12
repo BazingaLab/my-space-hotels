@@ -3,7 +3,7 @@ import HotelPortalLayout from "./HotelPortalLayout.jsx";
 import { useHotelPortal } from "../../context/HotelPortalContext.jsx";
 import { adminApi } from "../../lib/api.js";
 import { theme } from "../../lib/theme.js";
-import { Save, ToggleLeft, ToggleRight } from "lucide-react";
+import { Save, ToggleLeft, ToggleRight, Coffee } from "lucide-react";
 
 const TAGS = ["Heritage", "Beachfront", "Luxury", "Boutique", "Mountain", "City"];
 const AMENITIES = ["WiFi", "Pool", "Spa", "Restaurant", "Bar", "Parking", "Gym", "Beach Access", "Room Service", "Laundry", "Airport Transfer", "Pet Friendly", "Fireplace", "Garden", "Rooftop", "Yoga Deck", "Bicycles", "Library", "Trekking", "Boat Tours"];
@@ -20,6 +20,8 @@ export default function PropertyManager() {
       setForm({
         ...myHotel,
         amenities: myHotel.amenities || [],
+        breakfast_available: myHotel.breakfast_available || false,
+        breakfast_price: myHotel.breakfast_price || 0,
       });
     }
   }, [myHotel]);
@@ -46,6 +48,8 @@ export default function PropertyManager() {
         tag: form.tag,
         amenities: form.amenities,
         available: form.available,
+        breakfast_available: !!form.breakfast_available,
+        breakfast_price: Number(form.breakfast_price) || 0,
       });
       await refreshHotel();
       setSaved(true);
@@ -164,9 +168,24 @@ export default function PropertyManager() {
                 <label style={lbl}>Price per Night (₹)</label>
                 <input type="number" min="500" style={inp} value={form.price} onChange={e => setForm({ ...form, price: e.target.value })} />
               </div>
-              <div>
+              <div style={{ marginBottom: form.breakfast_available ? 16 : 0 }}>
                 <label style={lbl}>Number of Rooms</label>
                 <input type="number" min="1" style={inp} value={form.rooms} onChange={e => setForm({ ...form, rooms: e.target.value })} />
+              </div>
+
+              <div style={{ paddingTop: 16, borderTop: `1px solid ${theme.SAND}` }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: form.breakfast_available ? 14 : 0 }}>
+                  <input type="checkbox" id="breakfastToggle" checked={form.breakfast_available} onChange={e => setForm({ ...form, breakfast_available: e.target.checked })} style={{ width: 16, height: 16, cursor: "pointer" }} />
+                  <label htmlFor="breakfastToggle" style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, cursor: "pointer" }}>
+                    <Coffee size={14} color={theme.SEA} /> Offer Room + Breakfast
+                  </label>
+                </div>
+                {form.breakfast_available && (
+                  <div>
+                    <label style={lbl}>Breakfast Price (₹ / night)</label>
+                    <input type="number" min="0" style={inp} value={form.breakfast_price} onChange={e => setForm({ ...form, breakfast_price: e.target.value })} placeholder="e.g. 300" />
+                  </div>
+                )}
               </div>
             </div>
 

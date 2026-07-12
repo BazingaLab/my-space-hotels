@@ -6,7 +6,7 @@ import { calculateGst } from "../utils/gst.js";
 // POST /api/bookings
 export const createBooking = async (req, res) => {
   try {
-    const { hotel_id, guest_name, guest_email, guest_phone, check_in, check_out, guests, user_id } = req.body;
+    const { hotel_id, guest_name, guest_email, guest_phone, check_in, check_out, guests, user_id, meal_plan } = req.body;
 
     if (!hotel_id || !guest_name || !guest_email || !check_in || !check_out) {
       return res.status(400).json({ message: "Missing required fields" });
@@ -22,17 +22,22 @@ export const createBooking = async (req, res) => {
 
     const { data: hotel, error: hotelError } = await supabase
       .from("hotels")
-      .select("price, name")
+      .select("price, name, breakfast_available, breakfast_price")
       .eq("id", hotel_id)
       .single();
 
     if (hotelError || !hotel) return res.status(404).json({ message: "Hotel not found" });
 
-    const total_price = hotel.price * nights;
-    // GST slab is set by the hotel's nightly rate, applied to the whole stay.
-    // total_price stays pre-tax (wallet/commission base); grand_total is what
-    // the guest actually owes.
-    const { gstRate, gstAmount, grandTotal } = calculateGst(hotel.price, total_price);
+    // Meal plan: only apply the surcharge if the hotel actually offers breakfast —
+    // a guest can't force it on by passing the flag if the hotel never enabled it.
+    const wantsBreakfast = meal_plan === "breakfast_included" && hotel.breakfast_available;
+    const breakfastPricePerNight = wantsBreakfast ? Number(hotel.breakfast_price || 0) : 0;
+    const nightlyRate = Number(hotel.price) + breakfastPricePerNight;
+
+    const total_price = nightlyRate * nights;
+    // GST slab set by the effective nightly rate (room + breakfast, if chosen) —
+    // a bundled booking is one composite supply for GST purposes.
+    const { gstRate, gstAmount, grandTotal } = calculateGst(nightlyRate, total_price);
 
     const { data, error } = await supabase
       .from("bookings")
@@ -50,6 +55,8 @@ export const createBooking = async (req, res) => {
           gst_rate: gstRate,
           gst_amount: gstAmount,
           grand_total: grandTotal,
+          meal_plan: wantsBreakfast ? "breakfast_included" : "room_only",
+          breakfast_price_applied: breakfastPricePerNight,
           status: "confirmed",
           user_id: user_id || null,
         },
