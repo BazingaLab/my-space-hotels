@@ -13,7 +13,7 @@ const HotelPortalContext = createContext({
 });
 
 export function HotelPortalProvider({ children }) {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [myHotels, setMyHotels] = useState([]);
   const [activeHotelId, setActiveHotelId] = useState(null);
   const [isHotelier, setIsHotelier] = useState(false);
@@ -21,6 +21,7 @@ export function HotelPortalProvider({ children }) {
 
   const loadHotels = async () => {
     if (!user) { setLoading(false); return; }
+    setLoading(true);
     try {
       const roleData = await adminApi.getRole(user.id);
       const role = roleData.role;
@@ -29,7 +30,10 @@ export function HotelPortalProvider({ children }) {
 
       if (hotelier) {
         const hotelsData = await adminApi.getHotels();
-        // All hotels owned by this user
+        // TEMPORARY client-side filter — once GET /api/admin/hotels is
+        // role-scoped server-side (returning only this owner's hotels for
+        // hotel_admin), this .filter() becomes redundant but stays harmless
+        // as a defense-in-depth check.
         const owned = (hotelsData.hotels || []).filter(h => h.owner_id === user.id);
         setMyHotels(owned);
         // Keep the current selection if still valid, else default to the first
@@ -45,7 +49,13 @@ export function HotelPortalProvider({ children }) {
     }
   };
 
-  useEffect(() => { loadHotels(); }, [user]);
+  useEffect(() => {
+    // Wait for AuthContext to finish restoring the session first — same
+    // reasoning as AdminContext: avoids briefly reporting "not a hotelier,
+    // done loading" on refresh before the real user is even available.
+    if (authLoading) return;
+    loadHotels();
+  }, [user, authLoading]);
 
   // The active hotel object derived from the id
   const myHotel = myHotels.find(h => h.id === activeHotelId) || null;
@@ -53,7 +63,7 @@ export function HotelPortalProvider({ children }) {
   return (
     <HotelPortalContext.Provider value={{
       myHotel, myHotels, activeHotelId, setActiveHotelId,
-      loading, isHotelier, refreshHotel: loadHotels,
+      loading: authLoading || loading, isHotelier, refreshHotel: loadHotels,
     }}>
       {children}
     </HotelPortalContext.Provider>

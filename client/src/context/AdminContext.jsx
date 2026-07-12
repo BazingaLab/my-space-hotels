@@ -5,26 +5,33 @@ import { adminApi } from "../lib/api.js";
 const AdminContext = createContext({ role: "guest", isAdmin: false, isHotelAdmin: false, loading: true });
 
 export function AdminProvider({ children }) {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [role, setRole] = useState("guest");
-  const [loading, setLoading] = useState(true);
+  const [roleLoading, setRoleLoading] = useState(true);
 
   useEffect(() => {
+    // Wait for AuthContext to finish restoring the session first — otherwise
+    // a page refresh briefly reports "guest, done loading" before the real
+    // user object is even available, which can bounce an admin off a
+    // protected page before their real role has a chance to load.
+    if (authLoading) return;
+
     if (user?.id) {
+      setRoleLoading(true);
       adminApi.getRole(user.id)
         .then(data => setRole(data.role || "guest"))
         .catch(() => setRole("guest"))
-        .finally(() => setLoading(false));
+        .finally(() => setRoleLoading(false));
     } else {
       setRole("guest");
-      setLoading(false);
+      setRoleLoading(false);
     }
-  }, [user]);
+  }, [user, authLoading]);
 
   return (
     <AdminContext.Provider value={{
       role,
-      loading,
+      loading: authLoading || roleLoading,
       isAdmin: role === "super_admin",
       isHotelAdmin: role === "hotel_admin" || role === "super_admin",
     }}>

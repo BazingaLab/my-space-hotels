@@ -1,8 +1,20 @@
+import { supabase } from "./supabase.js";
+
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
 async function request(path, options = {}) {
+  // Attach the current Supabase session's access token, if one exists.
+  // Public endpoints (browsing hotels, guest checkout) work fine with no
+  // token — the server only requires one on routes that actually need it.
+  const { data: { session } } = await supabase.auth.getSession();
+  const token = session?.access_token;
+
   const res = await fetch(`${API_URL}${path}`, {
-    headers: { "Content-Type": "application/json", ...options.headers },
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...options.headers,
+    },
     ...options,
   });
   if (!res.ok) {
