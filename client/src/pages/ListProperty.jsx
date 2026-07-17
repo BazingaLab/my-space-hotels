@@ -3,14 +3,14 @@ import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext.jsx";
 import { pendingApi } from "../lib/api.js";
 import { theme } from "../lib/theme.js";
-import { ArrowRight, ArrowLeft, Check, Building2, FileText, ImageIcon, Eye, Upload, Coffee } from "lucide-react";
+import { ArrowRight, ArrowLeft, Check, Building2, FileText, ImageIcon, Eye, Upload, Coffee, Clock } from "lucide-react";
 import { supabase } from "../lib/supabase.js";
 import AddressInput from "../shared/components/AddressInput.jsx";
 
 const TAGS = ["Heritage", "Beachfront", "Boutique", "Hotel", "Resort", "BnB"];
 const AMENITIES = ["WiFi", "Pool", "Spa", "Restaurant", "Bar", "Parking", "Gym", "Beach Access", "Room Service", "Laundry", "Airport Transfer", "Pet Friendly", "Fireplace", "Garden", "Rooftop", "Yoga Deck", "Bicycles", "Library", "Trekking", "Boat Tours"];
 
-const empty = { name: "", city: "", state: "", district: "", pincode: "", building: "", street: "", landmark: "", post_office: "", tag: "Boutique", description: "", short_description: "", amenities: [], rooms: 1, price: "", cover_image: "", images: "", breakfast_available: false, breakfast_price: "" };
+const empty = { name: "", city: "", state: "", district: "", pincode: "", building: "", street: "", landmark: "", post_office: "", tag: "Boutique", description: "", short_description: "", amenities: [], rooms: 1, price: "", cover_image: "", images: "", breakfast_available: false, breakfast_price: "", hourly_available: false, hourly_price_4h: "", hourly_price_6h: "" };
 
 export default function ListProperty() {
   const { user } = useAuth();
@@ -37,7 +37,6 @@ export default function ListProperty() {
     }));
   };
 
-  // Upload an image to Supabase Storage and return its public URL
   const uploadImage = async (file, slot) => {
     if (!file) return null;
     if (!file.type.startsWith("image/")) { setError("Only image files allowed."); return null; }
@@ -79,6 +78,9 @@ export default function ListProperty() {
         images: form.images ? form.images.split(",").map(s => s.trim()).filter(Boolean) : [],
         breakfast_available: !!form.breakfast_available,
         breakfast_price: form.breakfast_available ? Number(form.breakfast_price) || 0 : 0,
+        hourly_available: !!form.hourly_available,
+        hourly_price_4h: form.hourly_available ? Number(form.hourly_price_4h) || 0 : 0,
+        hourly_price_6h: form.hourly_available ? Number(form.hourly_price_6h) || 0 : 0,
         owner_id: user.id,
         owner_email: user.email,
         owner_name: user.user_metadata?.full_name || "",
@@ -249,6 +251,27 @@ export default function ListProperty() {
               )}
             </div>
 
+            <div style={{ padding: 20, border: `1px solid ${theme.SAND}`, background: "#fff" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: form.hourly_available ? 14 : 0 }}>
+                <input type="checkbox" id="lp_hourly" checked={form.hourly_available} onChange={e => setForm({ ...form, hourly_available: e.target.checked })} style={{ width: 16, height: 16, cursor: "pointer" }} />
+                <label htmlFor="lp_hourly" style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14, cursor: "pointer" }}>
+                  <Clock size={15} color={theme.SEA} /> Offer hourly / short-stay bookings
+                </label>
+              </div>
+              {form.hourly_available && (
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, maxWidth: 400 }}>
+                  <div>
+                    <label style={lbl}>4-Hour Price (₹)</label>
+                    <input type="number" min="0" style={inp} placeholder="e.g. 800" value={form.hourly_price_4h} onChange={e => setForm({ ...form, hourly_price_4h: e.target.value })} />
+                  </div>
+                  <div>
+                    <label style={lbl}>6-Hour Price (₹)</label>
+                    <input type="number" min="0" style={inp} placeholder="e.g. 1200" value={form.hourly_price_6h} onChange={e => setForm({ ...form, hourly_price_6h: e.target.value })} />
+                  </div>
+                </div>
+              )}
+            </div>
+
             <div>
               <label style={lbl}>Cover Image *</label>
               <div
@@ -318,11 +341,12 @@ export default function ListProperty() {
                 <h3 className="serif" style={{ fontSize: 32, fontWeight: 400, marginBottom: 4 }}>{form.name || "—"}</h3>
                 <div style={{ fontSize: 14, color: theme.MUTED, marginBottom: 20 }}>{form.city}, {form.state}</div>
                 <p style={{ fontSize: 14, lineHeight: 1.7, color: "#4A5856", marginBottom: 24 }}>{form.description}</p>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16, marginBottom: 24 }}>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 16, marginBottom: 24 }}>
                   {[
                     { label: "Price", value: form.price ? `₹${Number(form.price).toLocaleString("en-IN")}/night` : "—" },
                     { label: "Rooms", value: form.rooms },
                     { label: "Breakfast", value: form.breakfast_available ? `+₹${Number(form.breakfast_price || 0).toLocaleString("en-IN")}/night` : "Not offered" },
+                    { label: "Hourly", value: form.hourly_available ? `₹${Number(form.hourly_price_4h || 0).toLocaleString("en-IN")} / ₹${Number(form.hourly_price_6h || 0).toLocaleString("en-IN")}` : "Not offered" },
                   ].map(item => (
                     <div key={item.label} style={{ padding: 16, background: theme.SAND }}>
                       <div style={{ fontSize: 10, letterSpacing: "0.15em", color: theme.MUTED, textTransform: "uppercase", marginBottom: 4 }}>{item.label}</div>
