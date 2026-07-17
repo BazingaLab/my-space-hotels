@@ -18,6 +18,12 @@ export default function CancellationPolicy() {
           ],
         },
         {
+          heading: "1a. Hourly & short-stay bookings",
+          paragraphs: [
+            "Hourly and short-stay bookings (4-hour and 6-hour slots) are non-refundable once confirmed, given their short-notice nature. This applies regardless of how far in advance the booking was made.",
+          ],
+        },
+        {
           heading: "2. Non-refundable bookings",
           paragraphs: ["Certain promotional offers, discounted rates, advance purchase deals, festival packages, and special event bookings may be marked as Non-Refundable. Such bookings cannot be cancelled, modified, or refunded unless required by applicable law."],
         },

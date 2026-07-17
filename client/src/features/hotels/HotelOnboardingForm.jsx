@@ -22,6 +22,7 @@ const empty = {
   building: "", street: "", landmark: "", district: "", post_office: "",
   latitude: null, longitude: null,
   breakfast_available: false, breakfast_price: 0,
+  hourly_available: false, hourly_price_4h: 0, hourly_price_6h: 0,
 };
 
 const inp = { width: "100%", padding: "11px 14px", border: `1px solid ${theme.SAND}`, background: "#fff", fontSize: 14, color: theme.INK, outline: "none", fontFamily: "Inter, sans-serif", boxSizing: "border-box" };
@@ -113,6 +114,9 @@ export default function HotelOnboardingForm({ initial = null, onSaved }) {
         latitude: f.latitude ?? null, longitude: f.longitude ?? null,
         breakfast_available: !!f.breakfast_available,
         breakfast_price: Number(f.breakfast_price) || 0,
+        hourly_available: !!f.hourly_available,
+        hourly_price_4h: Number(f.hourly_price_4h) || 0,
+        hourly_price_6h: Number(f.hourly_price_6h) || 0,
       };
       if (f.owner_password && f.owner_password.trim()) {
         payload.owner_password = f.owner_password.trim();
@@ -168,6 +172,21 @@ export default function HotelOnboardingForm({ initial = null, onSaved }) {
           {f.breakfast_available && (
             <div style={{ maxWidth: 260 }}>
               <Field label="Breakfast Surcharge (₹ / night)" k="breakfast_price" type="number" ph="e.g. 300" f={f} set={set} />
+            </div>
+          )}
+        </div>
+
+        <div style={{ marginTop: 16, padding: 16, border: `1px solid ${theme.SAND}`, background: theme.CREAM }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: f.hourly_available ? 14 : 0 }}>
+            <input type="checkbox" id="hourlyAvailable" checked={f.hourly_available} onChange={e => set("hourly_available", e.target.checked)} style={{ width: 16, height: 16, cursor: "pointer" }} />
+            <label htmlFor="hourlyAvailable" style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14, cursor: "pointer" }}>
+              <Clock size={15} color={theme.SEA} /> Offer hourly / short-stay bookings
+            </label>
+          </div>
+          {f.hourly_available && (
+            <div style={grid2}>
+              <Field label="4-Hour Price (₹)" k="hourly_price_4h" type="number" ph="e.g. 800" f={f} set={set} />
+              <Field label="6-Hour Price (₹)" k="hourly_price_6h" type="number" ph="e.g. 1200" f={f} set={set} />
             </div>
           )}
         </div>

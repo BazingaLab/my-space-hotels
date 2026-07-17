@@ -2,73 +2,46 @@ import { supabase } from "../config/supabase.js";
 import { createOrder as createRazorpayOrder, verifyPaymentSignature, verifyWebhookSignature } from "../config/razorpay.js";
 import { syncCustomerFromBooking } from "./customerController.js";
 import { creditBookingToWallet } from "./walletController.js";
-import { calculateGst } from "../utils/gst.js";
+import { priceBooking } from "../utils/pricing.js";
 
-// Shared with bookingController's pay-at-hotel flow — kept in sync manually
-// since there isn't a common "bookings" service module yet.
-async function priceBooking({ hotel_id, check_in, check_out, meal_plan }) {
-  if (check_in < new Date().toISOString().slice(0, 10)) throw new Error("Check-in date cannot be in the past");
-
-  const nights = Math.ceil((new Date(check_out) - new Date(check_in)) / (1000 * 60 * 60 * 24));
-  if (nights < 1) throw new Error("Check-out must be after check-in");
-
-  const { data: hotel, error } = await supabase.from("hotels").select("price, name, breakfast_available, breakfast_price").eq("id", hotel_id).single();
-  if (error || !hotel) throw new Error("Hotel not found");
-
-  const wantsBreakfast = meal_plan === "breakfast_included" && hotel.breakfast_available;
-  const breakfastPricePerNight = wantsBreakfast ? Number(hotel.breakfast_price || 0) : 0;
-  const nightlyRate = Number(hotel.price) + breakfastPricePerNight;
-
-  const total_price = nightlyRate * nights;
-  // GST slab set by the hotel's effective nightly rate, applied to the whole stay.
-  const { gstRate, gstAmount, grandTotal } = calculateGst(nightlyRate, total_price);
-
-  return {
-    nights, total_price, gstRate, gstAmount, grandTotal,
-    mealPlan: wantsBreakfast ? "breakfast_included" : "room_only",
-    breakfastPricePerNight,
-  };
-}
-
-// Runs the side effects a confirmed+paid booking needs. Safe to call more
-// than once for the same booking — callers must only invoke it the first
-// time a booking transitions into "confirmed" (checked by the caller).
 async function onBookingConfirmed(booking) {
   try {
     const customer = await syncCustomerFromBooking(booking);
     if (customer) await supabase.from("bookings").update({ customer_id: customer.id }).eq("id", booking.id);
   } catch (e) { console.error("Customer sync failed:", e.message); }
 
-  try { await creditBookingToWallet(booking); } // still keys off pre-tax total_price
+  try { await creditBookingToWallet(booking); }
   catch (e) { console.error("Wallet credit failed:", e.message); }
 }
 
 // POST /api/payments/create-order
-// Creates a "pending" booking (not yet confirmed) + a matching Razorpay
-// order. The booking is only confirmed once /verify or the webhook proves
-// the payment actually went through. The Razorpay order is for grand_total
-// (GST-inclusive) — that's the real amount charged to the guest's card.
 export const createOrderHandler = async (req, res) => {
   try {
-    const { hotel_id, guest_name, guest_email, guest_phone, check_in, check_out, guests, user_id, special_request, meal_plan } = req.body;
-    if (!hotel_id || !guest_name || !guest_email || !check_in || !check_out) {
+    const { hotel_id, guest_name, guest_email, guest_phone, check_in, check_out, guests, user_id, special_request, meal_plan, booking_type, slot_hours, start_time } = req.body;
+    if (!hotel_id || !guest_name || !guest_email || !check_in) {
+      return res.status(400).json({ message: "Missing required fields" });
+    }
+    if (booking_type !== "hourly" && !check_out) {
       return res.status(400).json({ message: "Missing required fields" });
     }
 
-    const { nights, total_price, gstRate, gstAmount, grandTotal, mealPlan, breakfastPricePerNight } = await priceBooking({ hotel_id, check_in, check_out, meal_plan });
+    const priced = await priceBooking({ hotel_id, check_in, check_out, meal_plan, booking_type, slot_hours, start_time });
 
     const { data: booking, error } = await supabase.from("bookings").insert([{
       hotel_id, guest_name, guest_email, guest_phone,
-      check_in, check_out, guests: guests || 2, nights, total_price,
-      gst_rate: gstRate, gst_amount: gstAmount, grand_total: grandTotal,
-      meal_plan: mealPlan, breakfast_price_applied: breakfastPricePerNight,
+      check_in: priced.checkInDate, check_out: priced.checkOutDate,
+      guests: guests || 2, nights: priced.nights, total_price: priced.total_price,
+      gst_rate: priced.gstRate, gst_amount: priced.gstAmount, grand_total: priced.grandTotal,
+      meal_plan: priced.mealPlan, breakfast_price_applied: priced.breakfastPricePerNight,
+      booking_type: priced.bookingType, slot_hours: priced.slotHours,
+      checkin_datetime: priced.checkinDatetime, checkout_datetime: priced.checkoutDatetime,
       status: "pending", payment_mode: "prepaid", payment_status: "pending",
       special_request: special_request || null, user_id: user_id || null,
     }]).select().single();
     if (error) throw error;
 
     const order = await createRazorpayOrder({
-      amountRupees: grandTotal,
+      amountRupees: priced.grandTotal,
       receipt: booking.id,
       notes: { booking_id: booking.id, hotel_id },
     });
@@ -77,11 +50,8 @@ export const createOrderHandler = async (req, res) => {
 
     res.status(201).json({
       key_id: process.env.RAZORPAY_KEY_ID,
-      order_id: order.id,
-      amount: order.amount,
-      currency: order.currency,
-      booking_id: booking.id,
-      booking: { ...booking, razorpay_order_id: order.id },
+      order_id: order.id, amount: order.amount, currency: order.currency,
+      booking_id: booking.id, booking: { ...booking, razorpay_order_id: order.id },
     });
   } catch (error) {
     res.status(400).json({ message: error.message });
@@ -89,9 +59,6 @@ export const createOrderHandler = async (req, res) => {
 };
 
 // POST /api/payments/verify
-// Called by the browser right after Razorpay Checkout's success handler
-// fires. This is the fast path; the webhook below is the backstop for the
-// ~3-5% of cases where the browser closes before this call is made.
 export const verifyPayment = async (req, res) => {
   try {
     const { booking_id, razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
@@ -102,13 +69,10 @@ export const verifyPayment = async (req, res) => {
     const { data: booking, error } = await supabase.from("bookings").select("*").eq("id", booking_id).single();
     if (error || !booking) return res.status(404).json({ message: "Booking not found" });
 
-    // Already confirmed (e.g. webhook got there first) — idempotent no-op.
     if (booking.status === "confirmed" && booking.payment_status === "paid") {
       return res.json({ message: "Booking confirmed", booking });
     }
 
-    // The order_id must match what we generated for this booking —
-    // otherwise someone could try to attach an unrelated payment to it.
     if (booking.razorpay_order_id !== razorpay_order_id) {
       return res.status(400).json({ message: "Order mismatch" });
     }
@@ -133,12 +97,10 @@ export const verifyPayment = async (req, res) => {
 };
 
 // POST /api/payments/webhook
-// Mounted with express.raw() in index.js (NOT express.json()) — the
-// signature is computed over the exact raw bytes Razorpay sent.
 export const webhook = async (req, res) => {
   try {
     const signature = req.headers["x-razorpay-signature"];
-    const rawBody = req.body; // Buffer, thanks to express.raw()
+    const rawBody = req.body;
     if (!signature || !rawBody) return res.status(400).json({ message: "Missing signature or body" });
 
     const valid = verifyWebhookSignature({ rawBody: rawBody.toString(), signature });
@@ -148,10 +110,10 @@ export const webhook = async (req, res) => {
     const event = payload.event;
     const paymentEntity = payload.payload?.payment?.entity;
     const orderId = paymentEntity?.order_id || payload.payload?.order?.entity?.id;
-    if (!orderId) return res.json({ status: "ok" }); // nothing we can act on
+    if (!orderId) return res.json({ status: "ok" });
 
     const { data: booking } = await supabase.from("bookings").select("*").eq("razorpay_order_id", orderId).single();
-    if (!booking) return res.json({ status: "ok" }); // not one of ours (or already deleted)
+    if (!booking) return res.json({ status: "ok" });
 
     if (event === "payment.captured" && booking.status !== "confirmed") {
       const { data: updated } = await supabase.from("bookings").update({
@@ -165,8 +127,6 @@ export const webhook = async (req, res) => {
     res.json({ status: "ok" });
   } catch (error) {
     console.error("Webhook error:", error.message);
-    // Non-200 makes Razorpay retry with backoff — right call for a
-    // transient failure (e.g. DB blip), which is the common case here.
     res.status(500).json({ message: "Webhook processing failed" });
   }
 };

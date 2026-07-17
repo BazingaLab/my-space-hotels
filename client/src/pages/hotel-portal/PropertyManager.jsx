@@ -3,7 +3,7 @@ import HotelPortalLayout from "./HotelPortalLayout.jsx";
 import { useHotelPortal } from "../../context/HotelPortalContext.jsx";
 import { adminApi } from "../../lib/api.js";
 import { theme } from "../../lib/theme.js";
-import { Save, ToggleLeft, ToggleRight, Coffee } from "lucide-react";
+import { Save, ToggleLeft, ToggleRight, Coffee, Clock } from "lucide-react";
 
 const TAGS = ["Heritage", "Beachfront", "Luxury", "Boutique", "Mountain", "City"];
 const AMENITIES = ["WiFi", "Pool", "Spa", "Restaurant", "Bar", "Parking", "Gym", "Beach Access", "Room Service", "Laundry", "Airport Transfer", "Pet Friendly", "Fireplace", "Garden", "Rooftop", "Yoga Deck", "Bicycles", "Library", "Trekking", "Boat Tours"];
@@ -22,6 +22,9 @@ export default function PropertyManager() {
         amenities: myHotel.amenities || [],
         breakfast_available: myHotel.breakfast_available || false,
         breakfast_price: myHotel.breakfast_price || 0,
+        hourly_available: myHotel.hourly_available || false,
+        hourly_price_4h: myHotel.hourly_price_4h || 0,
+        hourly_price_6h: myHotel.hourly_price_6h || 0,
       });
     }
   }, [myHotel]);
@@ -50,6 +53,9 @@ export default function PropertyManager() {
         available: form.available,
         breakfast_available: !!form.breakfast_available,
         breakfast_price: Number(form.breakfast_price) || 0,
+        hourly_available: !!form.hourly_available,
+        hourly_price_4h: Number(form.hourly_price_4h) || 0,
+        hourly_price_6h: Number(form.hourly_price_6h) || 0,
       });
       await refreshHotel();
       setSaved(true);
@@ -184,6 +190,27 @@ export default function PropertyManager() {
                   <div>
                     <label style={lbl}>Breakfast Price (₹ / night)</label>
                     <input type="number" min="0" style={inp} value={form.breakfast_price} onChange={e => setForm({ ...form, breakfast_price: e.target.value })} placeholder="e.g. 300" />
+                  </div>
+                )}
+              </div>
+
+              <div style={{ paddingTop: 16, borderTop: `1px solid ${theme.SAND}`, marginTop: 16 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: form.hourly_available ? 14 : 0 }}>
+                  <input type="checkbox" id="hourlyToggle" checked={form.hourly_available} onChange={e => setForm({ ...form, hourly_available: e.target.checked })} style={{ width: 16, height: 16, cursor: "pointer" }} />
+                  <label htmlFor="hourlyToggle" style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, cursor: "pointer" }}>
+                    <Clock size={14} color={theme.SEA} /> Offer hourly bookings
+                  </label>
+                </div>
+                {form.hourly_available && (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                    <div>
+                      <label style={lbl}>4-Hour Price (₹)</label>
+                      <input type="number" min="0" style={inp} value={form.hourly_price_4h} onChange={e => setForm({ ...form, hourly_price_4h: e.target.value })} placeholder="e.g. 800" />
+                    </div>
+                    <div>
+                      <label style={lbl}>6-Hour Price (₹)</label>
+                      <input type="number" min="0" style={inp} value={form.hourly_price_6h} onChange={e => setForm({ ...form, hourly_price_6h: e.target.value })} placeholder="e.g. 1200" />
+                    </div>
                   </div>
                 )}
               </div>
