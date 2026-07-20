@@ -4,7 +4,7 @@ import { theme } from "../lib/theme.js";
 export default function HotelPartnerTerms() {
   return (
     <PolicyLayout
-      eyebrow="— Last Updated: __________"
+      eyebrow="— Last Updated: 20-07-2026"
       title="Hotel Partner"
       accent="Terms & Conditions."
       intro='Welcome to Rooming Hospitality. By creating a hotel partner account, submitting your property details, or clicking "I Agree," you acknowledge that you have read, understood, and agreed to be legally bound by these Terms & Conditions. If you do not agree to these Terms, please do not register your property on our platform.'
