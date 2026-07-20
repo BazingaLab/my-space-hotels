@@ -6,7 +6,7 @@ import Logo from "./Logo.jsx";
 export default function Footer() {
   const cols = [
     { title: "Discover", links: ["All Stays", "Destinations", "Experiences", "Gift Cards", "List Your Property"] },
-    { title: "Company", links: ["Our Story", "Press", "Careers", "Sustainability"] },
+    { title: "Company", links: ["Our Story", "Press", "Careers", "Sustainability", "Hotel Partner Terms"] },
     { title: "Support", links: ["Help Centre", "Contact", "Cancellations", "Trust & Safety"] },
   ];
 
@@ -17,6 +17,7 @@ export default function Footer() {
     "Sustainability": "/sustainability",
     "Cancellations": "/cancellation-policy",
     "Trust & Safety": "/trust-safety",
+    "Hotel Partner Terms": "/hotel-partner-terms",
   };
 
   return (

@@ -34,6 +34,7 @@ import OurStory from "./pages/OurStory.jsx";
 import TrustSafety from "./pages/TrustSafety.jsx";
 import Sustainability from "./pages/Sustainability.jsx";
 import CancellationPolicy from "./pages/CancellationPolicy.jsx";
+import HotelPartnerTerms from "./pages/HotelPartnerTerms.jsx";
 
 /* =========================
    ADMIN PAGES
@@ -137,6 +138,7 @@ function AppRoutes() {
         <Route path="/trust-safety" element={<TrustSafety />} />
         <Route path="/sustainability" element={<Sustainability />} />
         <Route path="/cancellation-policy" element={<CancellationPolicy />} />
+        <Route path="/hotel-partner-terms" element={<HotelPartnerTerms />} />
 
         {/* =========================
             AUTHENTICATED USER ROUTES
