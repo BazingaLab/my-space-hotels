@@ -1,9 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { theme } from "../../lib/theme.js";
 import { adminApi, walletsApi } from "../../lib/api.js";
 import { useAuth } from "../../context/AuthContext.jsx";
 import { supabase } from "../../lib/supabase.js";
-import { Save, Building2, User, FileText, MapPin, Clock, IndianRupee, Landmark, Upload, Image as ImageIcon, KeyRound, Star, Coffee } from "lucide-react";
+import { Save, Building2, User, FileText, MapPin, Clock, IndianRupee, Landmark, Upload, Image as ImageIcon, KeyRound, Star, Coffee, X } from "lucide-react";
 import AddressInput from "../../shared/components/AddressInput.jsx";
 import LocationPicker from "../../shared/components/LocationPicker.jsx";
 
@@ -24,6 +24,29 @@ const empty = {
   breakfast_available: false, breakfast_price: 0,
   hourly_available: false, hourly_price_4h: 0, hourly_price_6h: 0,
 };
+
+// Draft autosave — only for NEW hotels (never edits, to avoid a stale draft
+// silently overwriting someone else's real changes to an existing listing).
+// Guards against exactly the scenario a browser tab-discard causes: all
+// unsaved typing surviving a reload. owner_password is deliberately never
+// persisted here — no reason to leave a plaintext password sitting in
+// localStorage even briefly.
+const DRAFT_KEY = "msh_new_hotel_draft";
+function saveDraft(f) {
+  try {
+    const { owner_password, ...safe } = f;
+    localStorage.setItem(DRAFT_KEY, JSON.stringify(safe));
+  } catch (e) { /* storage full or unavailable — fail silently, not critical */ }
+}
+function loadDraft() {
+  try {
+    const raw = localStorage.getItem(DRAFT_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch (e) { return null; }
+}
+function clearDraft() {
+  try { localStorage.removeItem(DRAFT_KEY); } catch (e) {}
+}
 
 const inp = { width: "100%", padding: "11px 14px", border: `1px solid ${theme.SAND}`, background: "#fff", fontSize: 14, color: theme.INK, outline: "none", fontFamily: "Inter, sans-serif", boxSizing: "border-box" };
 const lbl = { fontSize: 10, letterSpacing: "0.15em", color: theme.SEA_DARK, textTransform: "uppercase", marginBottom: 6, display: "block", fontWeight: 600 };
@@ -52,7 +75,12 @@ function Field({ label, k, type = "text", ph = "", req = false, f, set }) {
 
 export default function HotelOnboardingForm({ initial = null, onSaved }) {
   const { user } = useAuth();
-  const [f, setF] = useState(initial ? { ...empty, ...initial, ...(initial.bank_details || {}), owner_password: "" } : empty);
+  const [f, setF] = useState(() => {
+    if (initial) return { ...empty, ...initial, ...(initial.bank_details || {}), owner_password: "" };
+    const draft = loadDraft();
+    return draft ? { ...empty, ...draft } : empty;
+  });
+  const [draftRestored] = useState(() => !initial && !!loadDraft());
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
   const [ok, setOk] = useState(false);
@@ -61,6 +89,7 @@ export default function HotelOnboardingForm({ initial = null, onSaved }) {
   const [isDragging, setIsDragging] = useState(false);
   const [resetting, setResetting] = useState(false);
   const [eligibility, setEligibility] = useState(null);
+  const saveTimer = useRef(null);
 
   useEffect(() => {
     if (initial?.id) {
@@ -68,8 +97,22 @@ export default function HotelOnboardingForm({ initial = null, onSaved }) {
     }
   }, [initial?.id]);
 
+  // Autosave the draft as the admin types — debounced so it's not writing
+  // to localStorage on every keystroke. Skipped entirely in edit mode.
+  useEffect(() => {
+    if (initial) return;
+    clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => saveDraft(f), 400);
+    return () => clearTimeout(saveTimer.current);
+  }, [f, initial]);
+
   const set = (k, v) => setF(s => ({ ...s, [k]: v }));
   const toggleAmenity = (a) => setF(s => ({ ...s, amenities: s.amenities.includes(a) ? s.amenities.filter(x => x !== a) : [...s.amenities, a] }));
+
+  const discardDraft = () => {
+    clearDraft();
+    setF(empty);
+  };
 
   const uploadCover = async (file) => {
     if (!file) return;
@@ -132,8 +175,8 @@ export default function HotelOnboardingForm({ initial = null, onSaved }) {
       if (res?.ownerProvisioningError) setError(`Hotel saved, but owner login could not be created: ${res.ownerProvisioningError}`);
       setOk(true);
       set("owner_password", "");
+      if (!initial) { clearDraft(); setF(empty); }
       if (onSaved) onSaved();
-      if (!initial) setF(empty);
     } catch (err) { setError(err.message); }
     finally { setSaving(false); }
   };
@@ -150,6 +193,15 @@ export default function HotelOnboardingForm({ initial = null, onSaved }) {
 
   return (
     <form onSubmit={submit}>
+      {draftRestored && (
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 16px", background: "#E8F5F3", border: `1px solid ${theme.SEA}33`, marginBottom: 16, fontSize: 13, color: theme.SEA_DARK }}>
+          <span>Restored your unsaved draft from last time.</span>
+          <button type="button" onClick={discardDraft} style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "transparent", border: "none", color: theme.SEA_DARK, cursor: "pointer", fontSize: 12, textDecoration: "underline" }}>
+            <X size={12} /> Discard & start fresh
+          </button>
+        </div>
+      )}
+
       <Section icon={Building2} title="Property Details">
         <div style={{ marginBottom: 16 }}><Field label="Hotel Name" k="name" ph="The Heritage Verandah" req f={f} set={set} /></div>
         <div style={grid3}>
@@ -245,6 +297,7 @@ export default function HotelOnboardingForm({ initial = null, onSaved }) {
           <div style={{ fontSize: 11, color: theme.MUTED, marginTop: 4 }}>
             Login email is always the Owner Email above. Minimum 6 characters if you set one.
             {initial?.owner_id && " Typing something here and saving will reset their password to this."}
+            {" "}This field is never autosaved as a draft.
           </div>
         </div>
 
