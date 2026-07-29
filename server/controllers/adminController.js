@@ -2,11 +2,6 @@ import { supabase } from "../config/supabase.js";
 import { ensureWallet } from "./walletController.js";
 
 // GET /api/admin/role/:user_id
-// Protected by `authenticate` only (any logged-in user may check a role) —
-// but always returns the AUTHENTICATED caller's own role, never whatever
-// :user_id happens to be in the URL. There's no legitimate case in this app
-// for checking someone else's role, and trusting the URL param was exactly
-// the original vulnerability here.
 export const getUserRole = async (req, res) => {
   try {
     const { data, error } = await supabase
@@ -63,9 +58,6 @@ export const getAllUsers = async (req, res) => {
 };
 
 // GET /api/admin/hotels
-// super_admin: every hotel. hotel_admin: only hotels they own — this is what
-// makes it safe for BOTH AdminHotels.jsx (super_admin) and
-// HotelPortalContext.jsx (hotel_admin) to keep sharing this one endpoint.
 export const adminGetHotels = async (req, res) => {
   try {
     let query = supabase.from("hotels").select("*").order("created_at", { ascending: false });
@@ -80,8 +72,6 @@ export const adminGetHotels = async (req, res) => {
   }
 };
 
-// Generate a readable temporary password — used only when the admin doesn't
-// type one in themselves.
 function genTempPassword() {
   const part = Math.random().toString(36).slice(-6);
   return `MSH-${part}${Math.floor(10 + Math.random() * 89)}`;
@@ -111,16 +101,17 @@ async function provisionOwnerAccount(ownerEmail, customPassword) {
     credentials = { email, tempPassword: password };
   }
 
-  await supabase.from("user_roles").upsert([{ user_id: ownerId, role: "hotel_admin" }], { onConflict: "user_id" });
+  // Never downgrade an existing super_admin just because their email got
+  // typed into a hotel's Owner Email field — this exact gap is what
+  // silently demoted a real super_admin account to hotel_admin before.
+  const { data: currentRole } = await supabase.from("user_roles").select("role").eq("user_id", ownerId).single();
+  if (currentRole?.role !== "super_admin") {
+    await supabase.from("user_roles").upsert([{ user_id: ownerId, role: "hotel_admin" }], { onConflict: "user_id" });
+  }
+
   return { ownerId, credentials };
 }
 
-// Fields only a super_admin may set — stripped from the request body for
-// hotel_admin callers before anything else touches it. Without this, an
-// owner editing their own property through PropertyManager.jsx could also
-// reassign who owns it, reset their own commission rate, or rewrite the
-// legal/tax details on file — ownership of the hotel row alone isn't
-// enough authorization for those specific fields.
 const SUPER_ADMIN_ONLY_FIELDS = [
   "owner_id", "owner_email", "owner_password", "commission_percent",
   "agreement_start_date", "agreement_end_date", "gst_number", "pan_number",
@@ -137,7 +128,7 @@ export const adminCreateHotel = async (req, res) => {
   try {
     const hotel = { ...req.body, images: req.body.images || [], amenities: req.body.amenities || [] };
     const ownerPassword = hotel.owner_password;
-    delete hotel.owner_password; // never persisted onto the hotels row
+    delete hotel.owner_password;
 
     let credentials = null;
     let provisioningError = null;
@@ -163,10 +154,6 @@ export const adminCreateHotel = async (req, res) => {
 };
 
 // PUT /api/admin/hotels/:id
-// super_admin: full access to any hotel. hotel_admin: only their own hotel
-// (enforced by requireHotelOwnership in adminRoutes.js), and only to
-// non-financial/non-account fields — an owner can update their listing,
-// not their own commission rate or who owns it.
 export const adminUpdateHotel = async (req, res) => {
   try {
     const { data: existing, error: fetchErr } = await supabase.from("hotels").select("owner_id, owner_email").eq("id", req.params.id).single();
@@ -178,8 +165,6 @@ export const adminUpdateHotel = async (req, res) => {
     let credentials = null;
     let provisioningError = null;
 
-    // owner_email is stripped out already for hotel_admin, so this branch
-    // only ever actually runs for super_admin.
     const emailChanged = patch.owner_email && patch.owner_email !== existing.owner_email;
     if (patch.owner_email && (!existing.owner_id || emailChanged || ownerPassword)) {
       try {
@@ -228,7 +213,7 @@ export const adminDeleteHotel = async (req, res) => {
   }
 };
 
-// GET /api/admin/bookings — every booking across every hotel — super_admin only.
+// GET /api/admin/bookings — super_admin only.
 export const adminGetBookings = async (req, res) => {
   try {
     const { data, error } = await supabase.from("bookings").select("*, hotels!hotel_id(name, city, cover_image)").order("created_at", { ascending: false });
@@ -240,9 +225,6 @@ export const adminGetBookings = async (req, res) => {
 };
 
 // GET /api/admin/bookings/owner/:owner_id
-// hotel_admin can only ever see their OWN bookings — the URL param is
-// ignored in favor of the verified caller's id unless they're super_admin,
-// who may still look up any owner's bookings by id.
 export const hotelAdminGetBookings = async (req, res) => {
   try {
     const owner_id = req.user.role === "super_admin" ? req.params.owner_id : req.user.id;
