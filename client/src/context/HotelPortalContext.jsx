@@ -3,8 +3,8 @@ import { useAuth } from "./AuthContext.jsx";
 import { adminApi } from "../lib/api.js";
 
 const HotelPortalContext = createContext({
-  myHotel: null,        // the currently-active hotel
-  myHotels: [],         // all hotels owned by this user
+  myHotel: null,
+  myHotels: [],
   activeHotelId: null,
   setActiveHotelId: () => {},
   loading: true,
@@ -30,13 +30,8 @@ export function HotelPortalProvider({ children }) {
 
       if (hotelier) {
         const hotelsData = await adminApi.getHotels();
-        // TEMPORARY client-side filter — once GET /api/admin/hotels is
-        // role-scoped server-side (returning only this owner's hotels for
-        // hotel_admin), this .filter() becomes redundant but stays harmless
-        // as a defense-in-depth check.
         const owned = (hotelsData.hotels || []).filter(h => h.owner_id === user.id);
         setMyHotels(owned);
-        // Keep the current selection if still valid, else default to the first
         setActiveHotelId(prev => {
           if (prev && owned.some(h => h.id === prev)) return prev;
           return owned[0]?.id || null;
@@ -50,14 +45,13 @@ export function HotelPortalProvider({ children }) {
   };
 
   useEffect(() => {
-    // Wait for AuthContext to finish restoring the session first — same
-    // reasoning as AdminContext: avoids briefly reporting "not a hotelier,
-    // done loading" on refresh before the real user is even available.
     if (authLoading) return;
     loadHotels();
-  }, [user, authLoading]);
+    // Same reasoning as AdminContext — depend on the stable id, not the
+    // user object reference, as a second line of defense against spurious
+    // re-fetches on tab refocus.
+  }, [user?.id, authLoading]);
 
-  // The active hotel object derived from the id
   const myHotel = myHotels.find(h => h.id === activeHotelId) || null;
 
   return (

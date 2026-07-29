@@ -10,10 +10,6 @@ export function AdminProvider({ children }) {
   const [roleLoading, setRoleLoading] = useState(true);
 
   useEffect(() => {
-    // Wait for AuthContext to finish restoring the session first — otherwise
-    // a page refresh briefly reports "guest, done loading" before the real
-    // user object is even available, which can bounce an admin off a
-    // protected page before their real role has a chance to load.
     if (authLoading) return;
 
     if (user?.id) {
@@ -26,7 +22,11 @@ export function AdminProvider({ children }) {
       setRole("guest");
       setRoleLoading(false);
     }
-  }, [user, authLoading]);
+    // Depends on user?.id specifically, not the user object — with
+    // AuthContext now bailing out on unchanged sessions this is somewhat
+    // belt-and-braces, but a stable primitive dependency is the correct
+    // pattern regardless of what upstream does.
+  }, [user?.id, authLoading]);
 
   return (
     <AdminContext.Provider value={{

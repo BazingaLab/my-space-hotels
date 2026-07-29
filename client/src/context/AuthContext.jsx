@@ -15,19 +15,30 @@ export function AuthProvider({ children }) {
       return;
     }
 
-    // Get current session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session ?? null);
       setUser(session?.user ?? null);
       setLoading(false);
     });
 
-    // Listen for auth changes
+    // Supabase fires this on every tab focus/visibility change, even when
+    // the session hasn't actually changed (documented library behavior,
+    // not a bug in this app) — only update state when something genuinely
+    // changed, so a tab refocus doesn't cascade into every dashboard
+    // re-fetching its data and feeling like a reload.
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session ?? null);
-      setUser(session?.user ?? null);
+    } = supabase.auth.onAuthStateChange((_event, newSession) => {
+      setSession(prev => {
+        if (prev?.access_token === newSession?.access_token && prev?.user?.id === newSession?.user?.id) {
+          return prev; // identical reference in, identical reference out — React skips the re-render
+        }
+        return newSession ?? null;
+      });
+      setUser(prev => {
+        if (prev?.id === newSession?.user?.id) return prev;
+        return newSession?.user ?? null;
+      });
     });
 
     return () => subscription.unsubscribe();
