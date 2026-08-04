@@ -21,15 +21,18 @@ export default function AuthCallback() {
         if (error) throw error;
         if (!session) throw new Error("No session found. The link may have expired.");
 
-        const userId = session.user.id;
         const intent = session.user.user_metadata?.signup_intent;
 
         if (intent === "hotel_owner") {
-          // Assign hotel_admin role via backend
-          const res = await fetch(`${import.meta.env.VITE_API_URL}/api/admin/promote`, {
+          // Self-service role claim — requires the fresh session token,
+          // and only succeeds because this account's own signup_intent
+          // metadata says hotel_owner (checked server-side).
+          const res = await fetch(`${import.meta.env.VITE_API_URL}/api/admin/claim-hotel-owner-role`, {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ user_id: userId, role: "hotel_admin" }),
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${session.access_token}`,
+            },
           });
           if (!res.ok) throw new Error("Could not assign partner role. Please contact support.");
           setStatus("success");

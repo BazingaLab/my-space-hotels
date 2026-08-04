@@ -37,6 +37,34 @@ export const promoteUser = async (req, res) => {
   }
 };
 
+// POST /api/admin/claim-hotel-owner-role
+// Self-service counterpart to promoteUser — for the hotel-owner self-signup
+// flow specifically. Any logged-in user may call this (no role gate), but
+// it's still safe: it never trusts a role or user_id from the request body.
+// Eligibility comes from signup_intent on the caller's OWN metadata (set
+// server-side at signup, not attacker-controlled here), and the role is
+// always granted to req.user.id — never an arbitrary account.
+export const claimHotelOwnerRole = async (req, res) => {
+  try {
+    const { data: { user }, error } = await supabase.auth.admin.getUserById(req.user.id);
+    if (error || !user) return res.status(404).json({ message: "User not found" });
+
+    if (user.user_metadata?.signup_intent !== "hotel_owner") {
+      return res.status(403).json({ message: "This account didn't sign up as a hotel owner" });
+    }
+
+    // Same guard as provisionOwnerAccount — never downgrade an existing super_admin.
+    const { data: currentRole } = await supabase.from("user_roles").select("role").eq("user_id", req.user.id).single();
+    if (currentRole?.role !== "super_admin") {
+      await supabase.from("user_roles").upsert([{ user_id: req.user.id, role: "hotel_admin" }], { onConflict: "user_id" });
+    }
+
+    res.json({ message: "Hotel owner role assigned" });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 // GET /api/admin/users — super_admin only.
 export const getAllUsers = async (req, res) => {
   try {

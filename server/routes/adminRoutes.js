@@ -4,7 +4,7 @@ import {
   getUserRole, promoteUser, getAllUsers,
   adminGetHotels, adminCreateHotel, adminUpdateHotel, adminDeleteHotel, resetOwnerPassword,
   adminGetBookings, hotelAdminGetBookings,
-  adminGetAnalytics,
+  adminGetAnalytics, claimHotelOwnerRole,
 } from "../controllers/adminController.js";
 
 const router = express.Router();
@@ -12,8 +12,10 @@ const router = express.Router();
 // Every route requires a verified session at minimum.
 router.use(authenticate);
 
-// Any logged-in user may check their own role.
+// Any logged-in user may check their own role, or claim hotel_admin if
+// they signed up through the hotel-owner self-signup flow.
 router.get("/role/:user_id", getUserRole);
+router.post("/claim-hotel-owner-role", claimHotelOwnerRole);
 
 // super_admin only — user management, hotel creation/deletion, cross-hotel views.
 router.post("/promote", requireRole("super_admin"), promoteUser);
