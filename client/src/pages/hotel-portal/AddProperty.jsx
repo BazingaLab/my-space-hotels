@@ -5,11 +5,15 @@ import { useHotelPortal } from "../../context/HotelPortalContext.jsx";
 import { useAuth } from "../../context/AuthContext.jsx";
 import { pendingApi } from "../../lib/api.js";
 import { theme } from "../../lib/theme.js";
-import { Building2, Send, CheckCircle2, Upload, Image as ImageIcon } from "lucide-react";
+import { Building2, Send, CheckCircle2, Upload, Image as ImageIcon, Coffee, Clock, ShieldCheck } from "lucide-react";
 import { supabase } from "../../lib/supabase.js";
 import AddressInput from "../../shared/components/AddressInput.jsx";
 
 const TAGS = ["Heritage", "Beachfront", "Boutique", "Hotel", "Resort", "BnB"];
+// Same amenity list used on ListProperty.jsx / PropertyManager.jsx — kept
+// identical across every creation surface so a property looks the same
+// regardless of which form an owner used to add it.
+const AMENITIES = ["WiFi", "Pool", "Spa", "Restaurant", "Bar", "Parking", "Gym", "Beach Access", "Room Service", "Laundry", "Airport Transfer", "Pet Friendly", "Fireplace", "Garden", "Rooftop", "Yoga Deck", "Bicycles", "Library", "Trekking", "Boat Tours"];
 
 export default function AddProperty() {
   const { user } = useAuth();
@@ -20,6 +24,15 @@ export default function AddProperty() {
     name: "", city: "", state: "", description: "", short_description: "",
     price: "", rooms: 1, tag: "Boutique", cover_image: "",
     contact_number: "", property_address: "", pincode: "", google_map_link: "",
+    // AddressInput reads these — previously undefined, which made those
+    // fields start uncontrolled and flip to controlled on first keystroke.
+    // Initializing them here as empty strings fixes that.
+    building: "", street: "", landmark: "", post_office: "", district: "",
+    amenities: [],
+    bedrooms: 1, beds: 1, bathrooms: 1, max_guests: 4, house_rules: "",
+    free_cancellation_hours: 24,
+    breakfast_available: false, breakfast_price: "",
+    hourly_available: false, hourly_price_4h: "", hourly_price_6h: "",
   });
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
@@ -28,6 +41,13 @@ export default function AddProperty() {
   const [isDragging, setIsDragging] = useState(false);
 
   const set = (k, v) => setForm(s => ({ ...s, [k]: v }));
+
+  const toggleAmenity = (a) => {
+    setForm(f => ({
+      ...f,
+      amenities: f.amenities.includes(a) ? f.amenities.filter(x => x !== a) : [...f.amenities, a],
+    }));
+  };
 
   const uploadCover = async (file) => {
     if (!file) return;
@@ -57,6 +77,20 @@ export default function AddProperty() {
         ...form,
         price: Number(form.price) || 0,
         rooms: Number(form.rooms) || 1,
+        bedrooms: Number(form.bedrooms) || 1,
+        beds: Number(form.beds) || 1,
+        bathrooms: Number(form.bathrooms) || 1,
+        max_guests: Number(form.max_guests) || 1,
+        house_rules: form.house_rules || null,
+        // Falls back to 24 if left blank — the same default used across
+        // every other creation form, so a property's cancellation window
+        // is never genuinely undefined regardless of which form made it.
+        free_cancellation_hours: Number(form.free_cancellation_hours) || 24,
+        breakfast_available: !!form.breakfast_available,
+        breakfast_price: form.breakfast_available ? Number(form.breakfast_price) || 0 : 0,
+        hourly_available: !!form.hourly_available,
+        hourly_price_4h: form.hourly_available ? Number(form.hourly_price_4h) || 0 : 0,
+        hourly_price_6h: form.hourly_available ? Number(form.hourly_price_6h) || 0 : 0,
         owner_id: user.id,
         owner_email: user.email,
         owner_name: user.user_metadata?.full_name || "",
@@ -109,12 +143,86 @@ export default function AddProperty() {
             <div><label style={lbl}>State</label><input style={inp} value={form.state} onChange={e => set("state", e.target.value)} /></div>
           </div>
 
+          {/* Room details — same five fields as every other creation form,
+              so a second property added here works identically to one
+              added via the main onboarding form or ListProperty.jsx. */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 16 }}>
+            <div><label style={lbl}>Bedrooms</label><input type="number" min="0" style={inp} value={form.bedrooms} onChange={e => set("bedrooms", e.target.value)} /></div>
+            <div><label style={lbl}>Beds</label><input type="number" min="0" style={inp} value={form.beds} onChange={e => set("beds", e.target.value)} /></div>
+            <div><label style={lbl}>Bathrooms</label><input type="number" min="0" style={inp} value={form.bathrooms} onChange={e => set("bathrooms", e.target.value)} /></div>
+            <div><label style={lbl}>Max Guests</label><input type="number" min="1" style={inp} value={form.max_guests} onChange={e => set("max_guests", e.target.value)} /></div>
+          </div>
+
           <div><label style={lbl}>Short Description</label><input style={inp} value={form.short_description} onChange={e => set("short_description", e.target.value)} placeholder="One-line summary" /></div>
           <div><label style={lbl}>Full Description</label><textarea style={{ ...inp, minHeight: 90 }} value={form.description} onChange={e => set("description", e.target.value)} /></div>
+          <div>
+            <label style={lbl}>House Rules (optional)</label>
+            <textarea style={{ ...inp, minHeight: 70 }} placeholder="e.g. No smoking indoors, quiet hours after 10pm" value={form.house_rules} onChange={e => set("house_rules", e.target.value)} />
+          </div>
+
+          <div>
+            <label style={lbl}>Amenities</label>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              {AMENITIES.map(a => (
+                <button key={a} type="button" onClick={() => toggleAmenity(a)} style={{
+                  padding: "7px 14px", border: `1px solid ${form.amenities.includes(a) ? theme.SEA : theme.SAND}`,
+                  background: form.amenities.includes(a) ? `${theme.SEA}15` : "transparent",
+                  color: form.amenities.includes(a) ? theme.SEA_DARK : theme.INK,
+                  fontSize: 13, cursor: "pointer",
+                }}>{a}</button>
+              ))}
+            </div>
+          </div>
 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
             <div><label style={lbl}>Price / night (₹)</label><input type="number" style={inp} value={form.price} onChange={e => set("price", e.target.value)} /></div>
             <div><label style={lbl}>Rooms</label><input type="number" style={inp} value={form.rooms} onChange={e => set("rooms", e.target.value)} /></div>
+          </div>
+
+          {/* Cancellation window — its own card, matching the treatment
+              this got in ListProperty.jsx and the owner/admin edit forms. */}
+          <div style={{ padding: 18, border: `1px solid ${theme.SAND}`, background: theme.CREAM }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+              <ShieldCheck size={15} color={theme.SEA} />
+              <label style={{ ...lbl, marginBottom: 0 }}>Free Cancellation Window</label>
+            </div>
+            <div style={{ maxWidth: 220 }}>
+              <label style={lbl}>Hours before check-in</label>
+              <input type="number" min="0" style={inp} placeholder="24" value={form.free_cancellation_hours} onChange={e => set("free_cancellation_hours", e.target.value)} />
+            </div>
+          </div>
+
+          {/* Breakfast add-on — same toggle-plus-price pattern used
+              everywhere else this feature appears. */}
+          <div style={{ padding: 18, border: `1px solid ${theme.SAND}`, background: theme.CREAM }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: form.breakfast_available ? 12 : 0 }}>
+              <input type="checkbox" id="ap_breakfast" checked={form.breakfast_available} onChange={e => set("breakfast_available", e.target.checked)} style={{ width: 16, height: 16, cursor: "pointer" }} />
+              <label htmlFor="ap_breakfast" style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14, cursor: "pointer" }}>
+                <Coffee size={15} color={theme.SEA} /> Offer a "Room + Breakfast" option
+              </label>
+            </div>
+            {form.breakfast_available && (
+              <div style={{ maxWidth: 220 }}>
+                <label style={lbl}>Breakfast Surcharge (₹ / night)</label>
+                <input type="number" min="0" style={inp} placeholder="e.g. 300" value={form.breakfast_price} onChange={e => set("breakfast_price", e.target.value)} />
+              </div>
+            )}
+          </div>
+
+          {/* Hourly bookings — same toggle-plus-two-prices pattern. */}
+          <div style={{ padding: 18, border: `1px solid ${theme.SAND}`, background: theme.CREAM }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: form.hourly_available ? 12 : 0 }}>
+              <input type="checkbox" id="ap_hourly" checked={form.hourly_available} onChange={e => set("hourly_available", e.target.checked)} style={{ width: 16, height: 16, cursor: "pointer" }} />
+              <label htmlFor="ap_hourly" style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14, cursor: "pointer" }}>
+                <Clock size={15} color={theme.SEA} /> Offer hourly / short-stay bookings
+              </label>
+            </div>
+            {form.hourly_available && (
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, maxWidth: 360 }}>
+                <div><label style={lbl}>4-Hour Price (₹)</label><input type="number" min="0" style={inp} placeholder="e.g. 800" value={form.hourly_price_4h} onChange={e => set("hourly_price_4h", e.target.value)} /></div>
+                <div><label style={lbl}>6-Hour Price (₹)</label><input type="number" min="0" style={inp} placeholder="e.g. 1200" value={form.hourly_price_6h} onChange={e => set("hourly_price_6h", e.target.value)} /></div>
+              </div>
+            )}
           </div>
 
           <div>

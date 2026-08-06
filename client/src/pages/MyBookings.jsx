@@ -6,7 +6,7 @@ import { supabase } from "../lib/supabase.js";
 
 import { useAuth } from "../context/AuthContext.jsx";
 
-import { api } from "../lib/api.js";
+import { api, reviewApi } from "../lib/api.js";
 
 import { theme } from "../lib/theme.js";
 
@@ -16,6 +16,7 @@ import {
   Users,
   ArrowRight,
   ShieldAlert,
+  Star,
   X,
 } from "lucide-react";
 
@@ -53,6 +54,25 @@ export default function MyBookings() {
     });
 
   /* =========================
+     REVIEW STATE
+  ========================= */
+
+  const [showReviewModal, setShowReviewModal] =
+    useState(false);
+
+  const [reviewBooking, setReviewBooking] =
+    useState(null);
+
+  const [reviewLoading, setReviewLoading] =
+    useState(false);
+
+  const [reviewError, setReviewError] =
+    useState(null);
+
+  const [reviewForm, setReviewForm] =
+    useState({ rating: 0, comment: "" });
+
+  /* =========================
      FETCH BOOKINGS
   ========================= */
 
@@ -60,6 +80,8 @@ export default function MyBookings() {
     if (!user?.id) return;
     // Primary: bookings owned by this account (user_id).
     // Fallback: legacy/guest bookings matched by email.
+    // Each booking now also carries a `reviews` array (from the backend's
+    // embedded select) — empty if this stay hasn't been reviewed yet.
     api.getBookingsByUser(user.id)
       .then(async (data) => {
         let list = data.bookings || [];
@@ -110,8 +132,18 @@ export default function MyBookings() {
       color: theme.MUTED,
     });
 
+  // A stay can be reviewed once it's actually checked out, and only once —
+  // this mirrors the exact same rule the server enforces in
+  // reviewController.js, so the button never offers something the backend
+  // would then reject.
+  const canReview = (b) =>
+    b.checkin_status === "checked_out" && (!b.reviews || b.reviews.length === 0);
+
+  const existingReview = (b) =>
+    b.reviews && b.reviews.length > 0 ? b.reviews[0] : null;
+
   /* =========================
-     OPEN MODAL
+     OPEN MODAL — COMPLAINT
   ========================= */
 
   const openComplaintModal = (
@@ -126,6 +158,17 @@ export default function MyBookings() {
     });
 
     setShowComplaintModal(true);
+  };
+
+  /* =========================
+     OPEN MODAL — REVIEW
+  ========================= */
+
+  const openReviewModal = (booking) => {
+    setReviewBooking(booking);
+    setReviewForm({ rating: 0, comment: "" });
+    setReviewError(null);
+    setShowReviewModal(true);
   };
 
   /* =========================
@@ -197,6 +240,40 @@ export default function MyBookings() {
         setComplaintLoading(false);
       }
     };
+
+  /* =========================
+     SUBMIT REVIEW
+  ========================= */
+
+  const submitReview = async () => {
+    if (reviewForm.rating < 1) {
+      setReviewError("Please select a star rating.");
+      return;
+    }
+    setReviewLoading(true);
+    setReviewError(null);
+    try {
+      const created = await reviewApi.create({
+        booking_id: reviewBooking.id,
+        rating: reviewForm.rating,
+        comment: reviewForm.comment || null,
+      });
+      // Update this booking locally so the button flips to "Reviewed"
+      // immediately, without needing to refetch the whole list.
+      setBookings((prev) =>
+        prev.map((b) =>
+          b.id === reviewBooking.id
+            ? { ...b, reviews: [{ id: created.id, rating: created.rating }] }
+            : b
+        )
+      );
+      setShowReviewModal(false);
+    } catch (err) {
+      setReviewError(err.message || "Unable to submit review");
+    } finally {
+      setReviewLoading(false);
+    }
+  };
 
   return (
     <main
@@ -404,10 +481,11 @@ export default function MyBookings() {
               const hotel =
                 b.hotels || {};
 
+              const review = existingReview(b);
+
               return (
                 <div
                   key={b.id}
-                  onClick={() => navigate(`/my-bookings/${b.id}`)}
                   style={{
                     background:
                       "#fff",
@@ -418,11 +496,14 @@ export default function MyBookings() {
                       "200px 1fr auto",
                     overflow:
                       "hidden",
-                    cursor: "pointer",
                   }}
                 >
-                  {/* IMAGE */}
+                  {/* IMAGE — clicking the image/details area still opens
+                      the booking detail page; the action buttons below
+                      stop that click from bubbling up so they work
+                      independently. */}
                   <div
+                    onClick={() => navigate(`/my-bookings/${b.id}`)}
                     style={{
                       width: "100%",
                       height:
@@ -430,6 +511,7 @@ export default function MyBookings() {
                       minHeight: 160,
                       overflow:
                         "hidden",
+                      cursor: "pointer",
                     }}
                   >
                     {hotel.cover_image ? (
@@ -471,8 +553,10 @@ export default function MyBookings() {
 
                   {/* DETAILS */}
                   <div
+                    onClick={() => navigate(`/my-bookings/${b.id}`)}
                     style={{
                       padding: 28,
+                      cursor: "pointer",
                     }}
                   >
                     <div
@@ -616,10 +700,17 @@ export default function MyBookings() {
                       </div>
                     </div>
 
-                    {/* COMPLAINT BUTTON */}
+                    {/* ACTION BUTTONS — stopPropagation so clicking these
+                        doesn't also trigger the row's "go to detail page"
+                        click handler above. */}
                     <div
+                      onClick={(e) => e.stopPropagation()}
                       style={{
                         marginTop: 24,
+                        display: "flex",
+                        gap: 12,
+                        flexWrap: "wrap",
+                        alignItems: "center",
                       }}
                     >
                       <button
@@ -654,11 +745,55 @@ export default function MyBookings() {
                         Raise
                         Complaint
                       </button>
+
+                      {canReview(b) && (
+                        <button
+                          onClick={() => openReviewModal(b)}
+                          style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: 8,
+                            padding: "12px 18px",
+                            border: `1px solid ${theme.SEA}`,
+                            background: "transparent",
+                            color: theme.SEA_DARK,
+                            cursor: "pointer",
+                            fontSize: 13,
+                            fontWeight: 600,
+                          }}
+                        >
+                          <Star size={15} />
+                          Leave a Review
+                        </button>
+                      )}
+
+                      {review && (
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 6,
+                            fontSize: 13,
+                            color: theme.MUTED,
+                          }}
+                        >
+                          {Array.from({ length: 5 }).map((_, i) => (
+                            <Star
+                              key={i}
+                              size={14}
+                              fill={i < review.rating ? theme.SEA : "transparent"}
+                              stroke={theme.SEA}
+                            />
+                          ))}
+                          <span>Your review</span>
+                        </div>
+                      )}
                     </div>
                   </div>
 
                   {/* PRICE */}
                   <div
+                    onClick={() => navigate(`/my-bookings/${b.id}`)}
                     style={{
                       padding: 28,
                       borderLeft: `1px solid ${theme.SAND}`,
@@ -671,6 +806,7 @@ export default function MyBookings() {
                       alignItems:
                         "flex-end",
                       minWidth: 160,
+                      cursor: "pointer",
                     }}
                   >
                     <div
@@ -976,6 +1112,125 @@ export default function MyBookings() {
               {complaintLoading
                 ? "Submitting..."
                 : "Submit Complaint"}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* =========================
+          REVIEW MODAL
+      ========================= */}
+
+      {showReviewModal && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.5)",
+            display: "grid",
+            placeItems: "center",
+            zIndex: 999,
+            padding: 24,
+          }}
+        >
+          <div
+            style={{
+              width: "100%",
+              maxWidth: 480,
+              background: "#fff",
+              padding: 32,
+              position: "relative",
+            }}
+          >
+            <button
+              onClick={() => setShowReviewModal(false)}
+              style={{
+                position: "absolute",
+                right: 20,
+                top: 20,
+                border: "none",
+                background: "transparent",
+                cursor: "pointer",
+              }}
+            >
+              <X size={18} />
+            </button>
+
+            <div
+              style={{
+                fontSize: 11,
+                letterSpacing: "0.3em",
+                color: theme.SEA_DARK,
+                marginBottom: 10,
+                textTransform: "uppercase",
+              }}
+            >
+              {reviewBooking?.hotels?.name}
+            </div>
+
+            <h2 className="serif" style={{ fontSize: 32, marginBottom: 24 }}>
+              How was your stay?
+            </h2>
+
+            {/* STAR PICKER — click a star to set the rating; every star up
+                to and including the clicked one fills in. */}
+            <div style={{ display: "flex", gap: 6, marginBottom: 24 }}>
+              {Array.from({ length: 5 }).map((_, i) => {
+                const value = i + 1;
+                return (
+                  <button
+                    key={i}
+                    type="button"
+                    onClick={() => setReviewForm({ ...reviewForm, rating: value })}
+                    style={{ background: "transparent", border: "none", cursor: "pointer", padding: 4 }}
+                    aria-label={`${value} star${value > 1 ? "s" : ""}`}
+                  >
+                    <Star
+                      size={32}
+                      fill={value <= reviewForm.rating ? theme.SEA : "transparent"}
+                      stroke={theme.SEA}
+                    />
+                  </button>
+                );
+              })}
+            </div>
+
+            <div style={{ marginBottom: 24 }}>
+              <label style={{ display: "block", marginBottom: 8, fontSize: 12, fontWeight: 600 }}>
+                Your review (optional)
+              </label>
+              <textarea
+                rows={5}
+                value={reviewForm.comment}
+                onChange={(e) => setReviewForm({ ...reviewForm, comment: e.target.value })}
+                placeholder="What stood out about your stay?"
+                style={{ width: "100%", padding: 14, border: `1px solid ${theme.SAND}`, resize: "none" }}
+              />
+            </div>
+
+            {reviewError && (
+              <div style={{ color: "#a33", fontSize: 13, padding: 14, background: "#fff5f5", border: "1px solid #fcc", marginBottom: 20 }}>
+                {reviewError}
+              </div>
+            )}
+
+            <button
+              onClick={submitReview}
+              disabled={reviewLoading}
+              style={{
+                width: "100%",
+                padding: 16,
+                border: "none",
+                background: theme.SEA,
+                color: theme.CREAM,
+                fontSize: 13,
+                letterSpacing: "0.15em",
+                textTransform: "uppercase",
+                cursor: reviewLoading ? "not-allowed" : "pointer",
+                opacity: reviewLoading ? 0.7 : 1,
+              }}
+            >
+              {reviewLoading ? "Submitting…" : "Submit Review"}
             </button>
           </div>
         </div>

@@ -11,10 +11,15 @@ export const createBooking = async (req, res) => {
     if (!hotel_id || !guest_name || !guest_email || !check_in) {
       return res.status(400).json({ message: "Missing required fields" });
     }
+    // Nightly bookings need a check-out date; hourly bookings compute their
+    // own end time from start_time + slot_hours, so check_out is optional.
     if (booking_type !== "hourly" && !check_out) {
       return res.status(400).json({ message: "Missing required fields" });
     }
 
+    // priceBooking() handles both nightly and hourly pricing, GST, and
+    // (for hourly) the availability check — kept in one shared place so
+    // this and the Razorpay create-order path can never drift apart.
     const priced = await priceBooking({ hotel_id, check_in, check_out, meal_plan, booking_type, slot_hours, start_time });
 
     const { data, error } = await supabase
@@ -36,6 +41,8 @@ export const createBooking = async (req, res) => {
 
     if (error) throw error;
 
+    // Auto-create / update CRM customer record — best-effort, never blocks
+    // the booking itself from succeeding if this fails.
     try {
       const customer = await syncCustomerFromBooking(data);
       if (customer) {
@@ -44,6 +51,7 @@ export const createBooking = async (req, res) => {
       }
     } catch (e) { console.error("Customer sync failed:", e.message); }
 
+    // Credit hotel wallet (net of commission) — also best-effort.
     try { await creditBookingToWallet(data); }
     catch (e) { console.error("Wallet credit failed:", e.message); }
 
@@ -54,11 +62,15 @@ export const createBooking = async (req, res) => {
 };
 
 // GET /api/bookings/:email
+// Legacy/guest lookup path — includes an embedded `reviews` array per
+// booking (via the reviews.booking_id foreign key) so the frontend can
+// tell, without a second request, whether each stay's already been
+// reviewed. Empty array = not reviewed yet.
 export const getBookingsByEmail = async (req, res) => {
   try {
     const { data, error } = await supabase
       .from("bookings")
-      .select("*, hotels!hotel_id(name, city, cover_image)")
+      .select("*, hotels!hotel_id(name, city, cover_image), reviews(id, rating)")
       .ilike("guest_email", req.params.email)
       .order("created_at", { ascending: false });
 
@@ -70,29 +82,37 @@ export const getBookingsByEmail = async (req, res) => {
 };
 
 // GET /api/bookings/user/:userId
+// Returns bookings by user_id OR by the account email — so bookings
+// always show regardless of what email the user typed at checkout.
+// Same embedded `reviews` array as above, for the same reason.
 export const getBookingsByUser = async (req, res) => {
   try {
     const { userId } = req.params;
+
+    // Step 1: get the account email (service role can access auth.admin)
     const { data: { user }, error: authErr } = await supabase.auth.admin.getUserById(userId);
     const userEmail = user?.email || null;
 
+    // Step 2: bookings linked by user_id
     const { data: byId, error: e1 } = await supabase
       .from("bookings")
-      .select("*, hotels!hotel_id(name, city, cover_image)")
+      .select("*, hotels!hotel_id(name, city, cover_image), reviews(id, rating)")
       .eq("user_id", userId)
       .order("created_at", { ascending: false });
     if (e1) throw e1;
 
+    // Step 3: bookings linked by account email (catches typed-different-email case)
     let byEmail = [];
     if (userEmail) {
       const { data } = await supabase
         .from("bookings")
-        .select("*, hotels!hotel_id(name, city, cover_image)")
+        .select("*, hotels!hotel_id(name, city, cover_image), reviews(id, rating)")
         .ilike("guest_email", userEmail)
         .order("created_at", { ascending: false });
       byEmail = data || [];
     }
 
+    // Step 4: merge and deduplicate
     const seen = new Set();
     const combined = [...(byId || []), ...byEmail].filter(b => {
       if (seen.has(b.id)) return false;

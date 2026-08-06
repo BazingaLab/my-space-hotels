@@ -25,6 +25,11 @@ export default function PropertyManager() {
         hourly_available: myHotel.hourly_available || false,
         hourly_price_4h: myHotel.hourly_price_4h || 0,
         hourly_price_6h: myHotel.hourly_price_6h || 0,
+        bedrooms: myHotel.bedrooms || 1,
+        beds: myHotel.beds || 1,
+        bathrooms: myHotel.bathrooms || 1,
+        max_guests: myHotel.max_guests || 4,
+        house_rules: myHotel.house_rules || "",
       });
     }
   }, [myHotel]);
@@ -56,6 +61,11 @@ export default function PropertyManager() {
         hourly_available: !!form.hourly_available,
         hourly_price_4h: Number(form.hourly_price_4h) || 0,
         hourly_price_6h: Number(form.hourly_price_6h) || 0,
+        bedrooms: Number(form.bedrooms) || 1,
+        beds: Number(form.beds) || 1,
+        bathrooms: Number(form.bathrooms) || 1,
+        max_guests: Number(form.max_guests) || 1,
+        house_rules: form.house_rules || null,
       });
       await refreshHotel();
       setSaved(true);
@@ -106,6 +116,24 @@ export default function PropertyManager() {
                     <input style={inp} value={form.state} onChange={e => setForm({ ...form, state: e.target.value })} />
                   </div>
                 </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 16 }}>
+                  <div>
+                    <label style={lbl}>Bedrooms</label>
+                    <input type="number" min="0" style={inp} value={form.bedrooms} onChange={e => setForm({ ...form, bedrooms: e.target.value })} />
+                  </div>
+                  <div>
+                    <label style={lbl}>Beds</label>
+                    <input type="number" min="0" style={inp} value={form.beds} onChange={e => setForm({ ...form, beds: e.target.value })} />
+                  </div>
+                  <div>
+                    <label style={lbl}>Bathrooms</label>
+                    <input type="number" min="0" style={inp} value={form.bathrooms} onChange={e => setForm({ ...form, bathrooms: e.target.value })} />
+                  </div>
+                  <div>
+                    <label style={lbl}>Max Guests</label>
+                    <input type="number" min="1" style={inp} value={form.max_guests} onChange={e => setForm({ ...form, max_guests: e.target.value })} />
+                  </div>
+                </div>
                 <div>
                   <label style={lbl}>Property Type</label>
                   <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
@@ -126,6 +154,10 @@ export default function PropertyManager() {
                 <div>
                   <label style={lbl}>Full Description</label>
                   <textarea style={{ ...inp, minHeight: 140, resize: "vertical" }} value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} />
+                </div>
+                <div>
+                  <label style={lbl}>House Rules (optional)</label>
+                  <textarea style={{ ...inp, minHeight: 90, resize: "vertical" }} placeholder="e.g. No smoking indoors, quiet hours after 10pm" value={form.house_rules} onChange={e => setForm({ ...form, house_rules: e.target.value })} />
                 </div>
               </div>
             </div>

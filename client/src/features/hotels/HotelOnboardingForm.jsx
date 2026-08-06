@@ -1,9 +1,9 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { theme } from "../../lib/theme.js";
 import { adminApi, walletsApi } from "../../lib/api.js";
 import { useAuth } from "../../context/AuthContext.jsx";
 import { supabase } from "../../lib/supabase.js";
-import { Save, Building2, User, FileText, MapPin, Clock, IndianRupee, Landmark, Upload, Image as ImageIcon, KeyRound, Star, Coffee, X } from "lucide-react";
+import { Save, Building2, User, FileText, MapPin, Clock, IndianRupee, Landmark, Upload, Image as ImageIcon, KeyRound, Star, Coffee } from "lucide-react";
 import AddressInput from "../../shared/components/AddressInput.jsx";
 import LocationPicker from "../../shared/components/LocationPicker.jsx";
 
@@ -11,6 +11,8 @@ const HOTEL_TYPES = ["Budget", "Premium", "Resort"];
 const TAGS = ["Heritage", "Beachfront", "Boutique", "Hotel", "Resort", "BnB"];
 const AMENITIES = ["WiFi", "AC", "Parking", "Pool", "Spa", "Restaurant", "Bar", "Gym", "Room Service", "Laundry", "Airport Transfer", "Power Backup", "CCTV", "Elevator"];
 
+// Every field the form manages, including the new bedroom/bed/bathroom
+// details and the cancellation window added in this pass.
 const empty = {
   name: "", hotel_type: "Budget", owner_name: "", contact_number: "", owner_email: "", owner_password: "",
   gst_number: "", pan_number: "", property_address: "", city: "", state: "", pincode: "",
@@ -23,30 +25,9 @@ const empty = {
   latitude: null, longitude: null,
   breakfast_available: false, breakfast_price: 0,
   hourly_available: false, hourly_price_4h: 0, hourly_price_6h: 0,
+  bedrooms: 1, beds: 1, bathrooms: 1, max_guests: 4, house_rules: "",
+  free_cancellation_hours: 24,
 };
-
-// Draft autosave — only for NEW hotels (never edits, to avoid a stale draft
-// silently overwriting someone else's real changes to an existing listing).
-// Guards against exactly the scenario a browser tab-discard causes: all
-// unsaved typing surviving a reload. owner_password is deliberately never
-// persisted here — no reason to leave a plaintext password sitting in
-// localStorage even briefly.
-const DRAFT_KEY = "msh_new_hotel_draft";
-function saveDraft(f) {
-  try {
-    const { owner_password, ...safe } = f;
-    localStorage.setItem(DRAFT_KEY, JSON.stringify(safe));
-  } catch (e) { /* storage full or unavailable — fail silently, not critical */ }
-}
-function loadDraft() {
-  try {
-    const raw = localStorage.getItem(DRAFT_KEY);
-    return raw ? JSON.parse(raw) : null;
-  } catch (e) { return null; }
-}
-function clearDraft() {
-  try { localStorage.removeItem(DRAFT_KEY); } catch (e) {}
-}
 
 const inp = { width: "100%", padding: "11px 14px", border: `1px solid ${theme.SAND}`, background: "#fff", fontSize: 14, color: theme.INK, outline: "none", fontFamily: "Inter, sans-serif", boxSizing: "border-box" };
 const lbl = { fontSize: 10, letterSpacing: "0.15em", color: theme.SEA_DARK, textTransform: "uppercase", marginBottom: 6, display: "block", fontWeight: 600 };
@@ -54,6 +35,7 @@ const card = { background: "#fff", border: `1px solid ${theme.SAND}`, padding: 2
 const sectionTitle = { display: "flex", alignItems: "center", gap: 8, marginBottom: 20 };
 const grid2 = { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 };
 const grid3 = { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16 };
+const grid4 = { display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 16 };
 
 function Section({ icon: Icon, title, children }) {
   return (
@@ -75,12 +57,7 @@ function Field({ label, k, type = "text", ph = "", req = false, f, set }) {
 
 export default function HotelOnboardingForm({ initial = null, onSaved }) {
   const { user } = useAuth();
-  const [f, setF] = useState(() => {
-    if (initial) return { ...empty, ...initial, ...(initial.bank_details || {}), owner_password: "" };
-    const draft = loadDraft();
-    return draft ? { ...empty, ...draft } : empty;
-  });
-  const [draftRestored] = useState(() => !initial && !!loadDraft());
+  const [f, setF] = useState(initial ? { ...empty, ...initial, ...(initial.bank_details || {}), owner_password: "" } : empty);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
   const [ok, setOk] = useState(false);
@@ -89,7 +66,6 @@ export default function HotelOnboardingForm({ initial = null, onSaved }) {
   const [isDragging, setIsDragging] = useState(false);
   const [resetting, setResetting] = useState(false);
   const [eligibility, setEligibility] = useState(null);
-  const saveTimer = useRef(null);
 
   useEffect(() => {
     if (initial?.id) {
@@ -97,22 +73,8 @@ export default function HotelOnboardingForm({ initial = null, onSaved }) {
     }
   }, [initial?.id]);
 
-  // Autosave the draft as the admin types — debounced so it's not writing
-  // to localStorage on every keystroke. Skipped entirely in edit mode.
-  useEffect(() => {
-    if (initial) return;
-    clearTimeout(saveTimer.current);
-    saveTimer.current = setTimeout(() => saveDraft(f), 400);
-    return () => clearTimeout(saveTimer.current);
-  }, [f, initial]);
-
   const set = (k, v) => setF(s => ({ ...s, [k]: v }));
   const toggleAmenity = (a) => setF(s => ({ ...s, amenities: s.amenities.includes(a) ? s.amenities.filter(x => x !== a) : [...s.amenities, a] }));
-
-  const discardDraft = () => {
-    clearDraft();
-    setF(empty);
-  };
 
   const uploadCover = async (file) => {
     if (!file) return;
@@ -160,6 +122,14 @@ export default function HotelOnboardingForm({ initial = null, onSaved }) {
         hourly_available: !!f.hourly_available,
         hourly_price_4h: Number(f.hourly_price_4h) || 0,
         hourly_price_6h: Number(f.hourly_price_6h) || 0,
+        bedrooms: Number(f.bedrooms) || 1,
+        beds: Number(f.beds) || 1,
+        bathrooms: Number(f.bathrooms) || 1,
+        max_guests: Number(f.max_guests) || 1,
+        house_rules: f.house_rules || null,
+        // Defaults to 24 if left blank, matching the value the backend was
+        // already silently falling back to before this column existed.
+        free_cancellation_hours: Number(f.free_cancellation_hours) || 24,
       };
       if (f.owner_password && f.owner_password.trim()) {
         payload.owner_password = f.owner_password.trim();
@@ -175,8 +145,8 @@ export default function HotelOnboardingForm({ initial = null, onSaved }) {
       if (res?.ownerProvisioningError) setError(`Hotel saved, but owner login could not be created: ${res.ownerProvisioningError}`);
       setOk(true);
       set("owner_password", "");
-      if (!initial) { clearDraft(); setF(empty); }
       if (onSaved) onSaved();
+      if (!initial) setF(empty);
     } catch (err) { setError(err.message); }
     finally { setSaving(false); }
   };
@@ -193,15 +163,6 @@ export default function HotelOnboardingForm({ initial = null, onSaved }) {
 
   return (
     <form onSubmit={submit}>
-      {draftRestored && (
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 16px", background: "#E8F5F3", border: `1px solid ${theme.SEA}33`, marginBottom: 16, fontSize: 13, color: theme.SEA_DARK }}>
-          <span>Restored your unsaved draft from last time.</span>
-          <button type="button" onClick={discardDraft} style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "transparent", border: "none", color: theme.SEA_DARK, cursor: "pointer", fontSize: 12, textDecoration: "underline" }}>
-            <X size={12} /> Discard & start fresh
-          </button>
-        </div>
-      )}
-
       <Section icon={Building2} title="Property Details">
         <div style={{ marginBottom: 16 }}><Field label="Hotel Name" k="name" ph="The Heritage Verandah" req f={f} set={set} /></div>
         <div style={grid3}>
@@ -212,6 +173,13 @@ export default function HotelOnboardingForm({ initial = null, onSaved }) {
         <div style={{ ...grid2, marginTop: 16 }}>
           <Field label="Total Rooms" k="rooms" type="number" f={f} set={set} />
           <Field label="Price / Night (₹)" k="price" type="number" req f={f} set={set} />
+        </div>
+
+        <div style={{ ...grid4, marginTop: 16 }}>
+          <Field label="Bedrooms" k="bedrooms" type="number" f={f} set={set} />
+          <Field label="Beds" k="beds" type="number" f={f} set={set} />
+          <Field label="Bathrooms" k="bathrooms" type="number" f={f} set={set} />
+          <Field label="Max Guests" k="max_guests" type="number" f={f} set={set} />
         </div>
 
         <div style={{ marginTop: 16, padding: 16, border: `1px solid ${theme.SAND}`, background: theme.CREAM }}>
@@ -281,6 +249,10 @@ export default function HotelOnboardingForm({ initial = null, onSaved }) {
 
         <div style={{ marginTop: 16 }}><Field label="Short Description" k="short_description" f={f} set={set} /></div>
         <div style={{ marginTop: 16 }}><label style={lbl}>Full Description</label><textarea style={{ ...inp, minHeight: 90, resize: "vertical" }} value={f.description} onChange={e => set("description", e.target.value)} /></div>
+        <div style={{ marginTop: 16 }}>
+          <label style={lbl}>House Rules (optional)</label>
+          <textarea style={{ ...inp, minHeight: 70, resize: "vertical" }} placeholder="e.g. No smoking indoors, quiet hours after 10pm, no outside guests after midnight" value={f.house_rules} onChange={e => set("house_rules", e.target.value)} />
+        </div>
       </Section>
 
       <Section icon={User} title="Owner & Contact">
@@ -297,7 +269,6 @@ export default function HotelOnboardingForm({ initial = null, onSaved }) {
           <div style={{ fontSize: 11, color: theme.MUTED, marginTop: 4 }}>
             Login email is always the Owner Email above. Minimum 6 characters if you set one.
             {initial?.owner_id && " Typing something here and saving will reset their password to this."}
-            {" "}This field is never autosaved as a draft.
           </div>
         </div>
 
@@ -334,12 +305,16 @@ export default function HotelOnboardingForm({ initial = null, onSaved }) {
         </div>
       </Section>
 
-      <Section icon={Clock} title="Timings & Amenities">
-        <div style={grid2}>
+      <Section icon={Clock} title="Timings & Policies">
+        <div style={grid3}>
           <Field label="Check-in Time" k="checkin_time" type="time" f={f} set={set} />
           <Field label="Check-out Time" k="checkout_time" type="time" f={f} set={set} />
+          <Field label="Free Cancellation (hours before check-in)" k="free_cancellation_hours" type="number" ph="24" f={f} set={set} />
         </div>
-        <div style={{ marginTop: 16 }}>
+        <div style={{ fontSize: 11, color: theme.MUTED, marginTop: 6 }}>
+          Guests cancelling within this window before check-in won't receive an automatic full refund.
+        </div>
+        <div style={{ marginTop: 20 }}>
           <label style={lbl}>Amenities</label>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             {AMENITIES.map(a => (

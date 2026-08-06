@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import {
-  MapPin, Star, ArrowRight, Check, X, ChevronLeft, ChevronRight,
+  MapPin, Star, ArrowRight, Check, X, ChevronLeft, ChevronRight, Share2,
   Wifi, Snowflake, Car, Waves, Sparkles, UtensilsCrossed, Wine,
   Dumbbell, BellRing, Shirt, PlaneTakeoff, BatteryCharging, Camera, ArrowUpDown,
+  FileText, ClipboardList, ShieldCheck, Flag,
 } from "lucide-react";
 import { theme } from "../lib/theme.js";
 import { api } from "../lib/api.js";
@@ -22,6 +23,7 @@ export default function HotelDetail() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [lightboxIndex, setLightboxIndex] = useState(null);
+  const [shareCopied, setShareCopied] = useState(false);
 
   useEffect(() => {
     api.getHotelById(id)
@@ -32,7 +34,6 @@ export default function HotelDetail() {
 
   const images = hotel?.images?.length ? hotel.images : hotel?.cover_image ? [hotel.cover_image] : [];
 
-  // Lightbox keyboard controls
   useEffect(() => {
     if (lightboxIndex === null) return;
     const handler = (e) => {
@@ -48,12 +49,24 @@ export default function HotelDetail() {
     };
   }, [lightboxIndex, images.length]);
 
+  const handleShare = async () => {
+    const shareData = { title: hotel?.name, text: `Check out ${hotel?.name} on My Space Hotels`, url: window.location.href };
+    if (navigator.share) {
+      try { await navigator.share(shareData); } catch (e) { /* user cancelled — not an error */ }
+    } else {
+      await navigator.clipboard.writeText(window.location.href);
+      setShareCopied(true);
+      setTimeout(() => setShareCopied(false), 2000);
+    }
+  };
+
   if (loading) return <div style={{ padding: "120px 6vw", color: theme.MUTED }}>Loading…</div>;
   if (error) return <div style={{ padding: "120px 6vw", color: "#a33" }}>Couldn't load hotel: {error}</div>;
   if (!hotel) return <div style={{ padding: "120px 6vw" }}>Hotel not found.</div>;
 
   const thumbnails = images.slice(1, 5);
   const extraCount = images.length - 5;
+  const hasReviews = (hotel.review_count || 0) > 0;
 
   return (
     <main style={{ padding: "60px 6vw 100px" }}>
@@ -63,25 +76,32 @@ export default function HotelDetail() {
       </div>
 
       {/* Header */}
-      <div style={{ marginBottom: 32 }}>
-        <div style={{ fontSize: 11, letterSpacing: "0.3em", color: theme.SEA_DARK, marginBottom: 14, textTransform: "uppercase" }}>{hotel.tag}</div>
-        <h1 className="serif" style={{ fontSize: "clamp(40px, 6vw, 72px)", fontWeight: 400, lineHeight: 1, letterSpacing: "-0.01em", marginBottom: 16 }}>{hotel.name}</h1>
-        <div style={{ display: "flex", alignItems: "center", gap: 20, fontSize: 14, color: theme.MUTED, flexWrap: "wrap" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <MapPin size={14} /> {hotel.city}, {hotel.state}
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <Star size={14} fill={theme.SEA} stroke={theme.SEA} /> {hotel.rating} ({hotel.review_count} reviews)
-          </div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8, flexWrap: "wrap", gap: 16 }}>
+        <div>
+          <div style={{ fontSize: 11, letterSpacing: "0.3em", color: theme.SEA_DARK, marginBottom: 14, textTransform: "uppercase" }}>{hotel.tag}</div>
+          <h1 className="serif" style={{ fontSize: "clamp(40px, 6vw, 72px)", fontWeight: 400, lineHeight: 1, letterSpacing: "-0.01em" }}>{hotel.name}</h1>
+        </div>
+        <button onClick={handleShare} style={{
+          display: "flex", alignItems: "center", gap: 8, background: "transparent",
+          border: `1px solid ${theme.SAND}`, padding: "10px 18px", cursor: "pointer",
+          fontSize: 13, color: theme.INK, fontFamily: "inherit", marginTop: 8,
+        }}>
+          <Share2 size={15} /> {shareCopied ? "Link copied" : "Share"}
+        </button>
+      </div>
+
+      <div style={{ display: "flex", alignItems: "center", gap: 20, fontSize: 14, color: theme.MUTED, flexWrap: "wrap", marginBottom: 40 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <MapPin size={14} /> {hotel.city}, {hotel.state}
         </div>
       </div>
 
-      {/* Photo mosaic — main image + up to 4 thumbnails, click any to open the lightbox */}
+      {/* Photo mosaic */}
       {images.length > 0 && (
         <div className="grid-1-mobile" style={{
           display: "grid",
           gridTemplateColumns: thumbnails.length > 0 ? "2fr 1fr" : "1fr",
-          gap: 12, marginBottom: 56, height: 480,
+          gap: 12, marginBottom: 24, height: 480,
         }}>
           <div onClick={() => setLightboxIndex(0)} style={{ cursor: "pointer", overflow: "hidden", borderRadius: 4 }}>
             <img src={images[0]} alt={hotel.name} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
@@ -111,6 +131,25 @@ export default function HotelDetail() {
         </div>
       )}
 
+      {/* Quick facts row */}
+      <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap", fontSize: 14, color: theme.INK, marginBottom: 56, paddingBottom: 32, borderBottom: `1px solid ${theme.SAND}` }}>
+        <span>{hotel.max_guests || 4} guests</span>
+        <span style={{ color: theme.SAND }}>·</span>
+        <span>{hotel.bedrooms || 1} bedroom{(hotel.bedrooms || 1) !== 1 ? "s" : ""}</span>
+        <span style={{ color: theme.SAND }}>·</span>
+        <span>{hotel.beds || 1} bed{(hotel.beds || 1) !== 1 ? "s" : ""}</span>
+        <span style={{ color: theme.SAND }}>·</span>
+        <span>{hotel.bathrooms || 1} bathroom{(hotel.bathrooms || 1) !== 1 ? "s" : ""}</span>
+        <span style={{ color: theme.SAND }}>·</span>
+        {hasReviews ? (
+          <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <Star size={14} fill={theme.SEA} stroke={theme.SEA} /> {hotel.rating} ({hotel.review_count} reviews)
+          </span>
+        ) : (
+          <span style={{ color: theme.MUTED }}>No reviews yet</span>
+        )}
+      </div>
+
       {/* Body */}
       <div className="grid-1-mobile" style={{ display: "grid", gridTemplateColumns: "1.5fr 1fr", gap: 60 }}>
         <div>
@@ -136,22 +175,45 @@ export default function HotelDetail() {
 
           {hotel.latitude && hotel.longitude && (
             <>
-              <h3 className="serif" style={{ fontSize: 28, fontWeight: 400, marginBottom: 20 }}>Location</h3>
-              <div style={{ marginBottom: 40 }}>
-                <MapPreview latitude={hotel.latitude} longitude={hotel.longitude} />
+              <h3 className="serif" style={{ fontSize: 28, fontWeight: 400, marginBottom: 20 }}>Where you'll be</h3>
+              <div style={{ marginBottom: 12 }}>
+                <MapPreview latitude={hotel.latitude} longitude={hotel.longitude} interactive height={380} />
               </div>
+              <div style={{ fontSize: 13, color: theme.MUTED, marginBottom: 40 }}>{hotel.city}, {hotel.state}</div>
             </>
           )}
+
+          <h3 className="serif" style={{ fontSize: 28, fontWeight: 400, marginBottom: 20 }}>Things to know</h3>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 24, marginBottom: 24 }}>
+            <div>
+              <FileText size={18} color={theme.SEA_DARK} style={{ marginBottom: 10 }} />
+              <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 6 }}>Cancellation policy</div>
+              <p style={{ fontSize: 13, color: theme.MUTED, lineHeight: 1.6, marginBottom: 8 }}>Free cancellation up to 48 hours before check-in.</p>
+              <Link to="/cancellation-policy" style={{ fontSize: 12, color: theme.SEA_DARK, textDecoration: "underline" }}>Learn more</Link>
+            </div>
+            <div>
+              <ClipboardList size={18} color={theme.SEA_DARK} style={{ marginBottom: 10 }} />
+              <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 6 }}>House rules</div>
+              <p style={{ fontSize: 13, color: theme.MUTED, lineHeight: 1.6 }}>
+                {hotel.house_rules || "No specific house rules listed. Contact the property directly with questions."}
+              </p>
+            </div>
+            <div>
+              <ShieldCheck size={18} color={theme.SEA_DARK} style={{ marginBottom: 10 }} />
+              <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 6 }}>Safety & property</div>
+              <p style={{ fontSize: 13, color: theme.MUTED, lineHeight: 1.6, marginBottom: 8 }}>Our commitment to guest safety across every partner property.</p>
+              <Link to="/trust-safety" style={{ fontSize: 12, color: theme.SEA_DARK, textDecoration: "underline" }}>Learn more</Link>
+            </div>
+          </div>
         </div>
 
-        {/* Booking card — static flow, not sticky (see HotelDetail.jsx history:
-            sticky was the one rule capable of overlapping the gallery above). */}
+        {/* Booking card */}
         <aside style={{ alignSelf: "start", background: "#fff", padding: 32, border: `1px solid ${theme.SAND}`, boxShadow: "0 12px 40px rgba(15, 74, 67, 0.08)" }}>
           <div style={{ fontSize: 10, letterSpacing: "0.2em", color: theme.MUTED, textTransform: "uppercase", marginBottom: 4 }}>From</div>
           <div className="serif" style={{ fontSize: 36, fontWeight: 500, color: theme.SEA_DARK, marginBottom: 4 }}>
             ₹{Number(hotel.price).toLocaleString("en-IN")}
           </div>
-          <div style={{ fontSize: 13, color: theme.MUTED, marginBottom: 28 }}>per night, plus applicable GST</div>
+          <div style={{ fontSize: 13, color: theme.MUTED, marginBottom: 28 }}>per night — GST calculated at checkout</div>
 
           <Link to={`/book/${hotel.id}`} className="cta-btn" style={{
             display: "flex", justifyContent: "center", alignItems: "center", gap: 10,
@@ -161,14 +223,21 @@ export default function HotelDetail() {
             Reserve Now <ArrowRight size={14} />
           </Link>
 
-          <div style={{ fontSize: 12, color: theme.MUTED, textAlign: "center", lineHeight: 1.6 }}>
+          <div style={{ fontSize: 12, color: theme.MUTED, textAlign: "center", lineHeight: 1.6, marginBottom: 20 }}>
             Free cancellation up to 48 hours before check-in.
           </div>
 
-          <div style={{ marginTop: 28, paddingTop: 24, borderTop: `1px solid ${theme.SAND}`, display: "flex", justifyContent: "space-between", fontSize: 13 }}>
+          <div style={{ paddingTop: 20, borderTop: `1px solid ${theme.SAND}`, display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 20 }}>
             <span style={{ color: theme.MUTED }}>Rooms available</span>
             <span style={{ fontWeight: 600 }}>{hotel.rooms}</span>
           </div>
+
+          
+            href={`mailto:support@myspacehotels.in?subject=${encodeURIComponent(`Reporting listing: ${hotel.name} (${hotel.id})`)}`}
+            style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, fontSize: 12, color: theme.MUTED, textDecoration: "underline" }}
+          >
+            <Flag size={12} /> Report this listing
+          </a>
         </aside>
       </div>
 

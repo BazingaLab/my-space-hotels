@@ -1,14 +1,12 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { guestBookingApi, reviewApi } from "../lib/api.js";
-import { useAuth } from "../context/AuthContext.jsx";
 import { theme } from "../lib/theme.js";
 import { ArrowLeft, MapPin, Clock, Phone, Calendar, Users, IndianRupee, Star, X, CheckCircle2, Ban } from "lucide-react";
 
 export default function BookingDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { user } = useAuth();
   const [booking, setBooking] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -30,7 +28,12 @@ export default function BookingDetail() {
   const h = booking.hotels || {};
   const fmt = d => new Date(d).toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "long", year: "numeric" });
   const isPast = new Date(booking.check_out) < new Date();
-  const canReview = isPast && booking.status !== "cancelled" && !booking.review;
+  // Matches the server's own rule exactly (reviewController.js requires
+  // checkin_status === "checked_out") — previously this checked whether the
+  // checkout DATE had passed, which isn't the same thing: a guest whose
+  // stay dates were over but whom the front desk never marked as checked
+  // out would see this button, then get rejected by the server on submit.
+  const canReview = booking.checkin_status === "checked_out" && booking.status !== "cancelled" && !booking.review;
 
   return (
     <div style={{ maxWidth: 800, margin: "0 auto", padding: "40px 6vw 80px" }}>
@@ -108,8 +111,8 @@ export default function BookingDetail() {
         </div>
       )}
 
-      {showCancel && <CancelModal booking={booking} user={user} onClose={() => setShowCancel(false)} onDone={(m) => { setMsg(m); setShowCancel(false); load(); }} />}
-      {showReview && <ReviewModal booking={booking} user={user} onClose={() => setShowReview(false)} onDone={(m) => { setMsg(m); setShowReview(false); load(); }} />}
+      {showCancel && <CancelModal booking={booking} onClose={() => setShowCancel(false)} onDone={(m) => { setMsg(m); setShowCancel(false); load(); }} />}
+      {showReview && <ReviewModal booking={booking} onClose={() => setShowReview(false)} onDone={(m) => { setMsg(m); setShowReview(false); load(); }} />}
     </div>
   );
 }
@@ -137,13 +140,16 @@ function StatusPill({ status }) {
   return <span style={{ background: s.bg, color: s.c, padding: "6px 14px", fontSize: 11, letterSpacing: "0.1em", textTransform: "uppercase", fontWeight: 600 }}>{status}</span>;
 }
 
-function CancelModal({ booking, user, onClose, onDone }) {
+// No longer takes a `user` prop — cancellation ownership is now verified
+// server-side from the session token, so the client has nothing to send
+// beyond the booking id itself.
+function CancelModal({ booking, onClose, onDone }) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState(null);
   const submit = async () => {
     setBusy(true); setErr(null);
     try {
-      const res = await guestBookingApi.cancel(booking.id, user?.id);
+      const res = await guestBookingApi.cancel(booking.id);
       onDone(res.message);
     } catch (e) { setErr(e.message); setBusy(false); }
   };
@@ -164,7 +170,11 @@ function CancelModal({ booking, user, onClose, onDone }) {
   );
 }
 
-function ReviewModal({ booking, user, onClose, onDone }) {
+// No longer takes a `user` prop, and no longer sends hotel_id/user_id/
+// guest_name — reviewController.js now derives all three from the
+// verified booking + session server-side and ignores anything sent here,
+// so sending them was misleading about what's actually trusted.
+function ReviewModal({ booking, onClose, onDone }) {
   const [rating, setRating] = useState(0);
   const [hover, setHover] = useState(0);
   const [comment, setComment] = useState("");
@@ -174,7 +184,7 @@ function ReviewModal({ booking, user, onClose, onDone }) {
     if (!rating) { setErr("Please select a rating."); return; }
     setBusy(true); setErr(null);
     try {
-      await reviewApi.create({ booking_id: booking.id, hotel_id: booking.hotel_id, user_id: user?.id, guest_name: booking.guest_name, rating, comment });
+      await reviewApi.create({ booking_id: booking.id, rating, comment });
       onDone("Thank you! Your review has been posted.");
     } catch (e) { setErr(e.message); setBusy(false); }
   };

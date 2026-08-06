@@ -3,14 +3,25 @@ import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext.jsx";
 import { pendingApi } from "../lib/api.js";
 import { theme } from "../lib/theme.js";
-import { ArrowRight, ArrowLeft, Check, Building2, FileText, ImageIcon, Eye, Upload, Coffee, Clock } from "lucide-react";
+import { ArrowRight, ArrowLeft, Check, Building2, FileText, ImageIcon, Eye, Upload, Coffee, Clock, ShieldCheck } from "lucide-react";
 import { supabase } from "../lib/supabase.js";
 import AddressInput from "../shared/components/AddressInput.jsx";
 
 const TAGS = ["Heritage", "Beachfront", "Boutique", "Hotel", "Resort", "BnB"];
 const AMENITIES = ["WiFi", "Pool", "Spa", "Restaurant", "Bar", "Parking", "Gym", "Beach Access", "Room Service", "Laundry", "Airport Transfer", "Pet Friendly", "Fireplace", "Garden", "Rooftop", "Yoga Deck", "Bicycles", "Library", "Trekking", "Boat Tours"];
 
-const empty = { name: "", city: "", state: "", district: "", pincode: "", building: "", street: "", landmark: "", post_office: "", tag: "Boutique", description: "", short_description: "", amenities: [], rooms: 1, price: "", cover_image: "", images: "", breakfast_available: false, breakfast_price: "", hourly_available: false, hourly_price_4h: "", hourly_price_6h: "" };
+// Every field this multi-step form tracks, including the room-detail and
+// cancellation-window fields added in this pass. All default to the same
+// values used across the admin and owner-portal versions of this form, so
+// a hotel behaves identically no matter which form created it.
+const empty = {
+  name: "", city: "", state: "", district: "", pincode: "", building: "", street: "", landmark: "", post_office: "",
+  tag: "Boutique", description: "", short_description: "", amenities: [], rooms: 1, price: "", cover_image: "", images: "",
+  breakfast_available: false, breakfast_price: "",
+  hourly_available: false, hourly_price_4h: "", hourly_price_6h: "",
+  bedrooms: 1, beds: 1, bathrooms: 1, max_guests: 4, house_rules: "",
+  free_cancellation_hours: 24,
+};
 
 export default function ListProperty() {
   const { user } = useAuth();
@@ -81,6 +92,15 @@ export default function ListProperty() {
         hourly_available: !!form.hourly_available,
         hourly_price_4h: form.hourly_available ? Number(form.hourly_price_4h) || 0 : 0,
         hourly_price_6h: form.hourly_available ? Number(form.hourly_price_6h) || 0 : 0,
+        bedrooms: Number(form.bedrooms) || 1,
+        beds: Number(form.beds) || 1,
+        bathrooms: Number(form.bathrooms) || 1,
+        max_guests: Number(form.max_guests) || 1,
+        house_rules: form.house_rules || null,
+        // Falls back to 24 if left blank — same default every other form
+        // in the app uses, so a listing never ends up with a genuinely
+        // undefined cancellation window regardless of which form made it.
+        free_cancellation_hours: Number(form.free_cancellation_hours) || 24,
         owner_id: user.id,
         owner_email: user.email,
         owner_name: user.user_metadata?.full_name || "",
@@ -190,9 +210,27 @@ export default function ListProperty() {
                 ))}
               </div>
             </div>
-            <div>
-              <label style={lbl}>Number of Rooms</label>
-              <input type="number" min="1" style={{ ...inp, maxWidth: 160 }} value={form.rooms} onChange={e => setForm({ ...form, rooms: e.target.value })} />
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr 1fr", gap: 16 }}>
+              <div>
+                <label style={lbl}>Rooms</label>
+                <input type="number" min="1" style={inp} value={form.rooms} onChange={e => setForm({ ...form, rooms: e.target.value })} />
+              </div>
+              <div>
+                <label style={lbl}>Bedrooms</label>
+                <input type="number" min="0" style={inp} value={form.bedrooms} onChange={e => setForm({ ...form, bedrooms: e.target.value })} />
+              </div>
+              <div>
+                <label style={lbl}>Beds</label>
+                <input type="number" min="0" style={inp} value={form.beds} onChange={e => setForm({ ...form, beds: e.target.value })} />
+              </div>
+              <div>
+                <label style={lbl}>Bathrooms</label>
+                <input type="number" min="0" style={inp} value={form.bathrooms} onChange={e => setForm({ ...form, bathrooms: e.target.value })} />
+              </div>
+              <div>
+                <label style={lbl}>Max Guests</label>
+                <input type="number" min="1" style={inp} value={form.max_guests} onChange={e => setForm({ ...form, max_guests: e.target.value })} />
+              </div>
             </div>
           </div>
         )}
@@ -208,6 +246,10 @@ export default function ListProperty() {
             <div>
               <label style={lbl}>Full Description *</label>
               <textarea required style={{ ...inp, minHeight: 160, resize: "vertical" }} placeholder="Tell us what makes your property special. Be evocative — describe the experience, not just the facilities." value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} />
+            </div>
+            <div>
+              <label style={lbl}>House Rules (optional)</label>
+              <textarea style={{ ...inp, minHeight: 90, resize: "vertical" }} placeholder="e.g. No smoking indoors, quiet hours after 10pm, no outside guests after midnight" value={form.house_rules} onChange={e => setForm({ ...form, house_rules: e.target.value })} />
             </div>
             <div>
               <label style={lbl}>Amenities</label>
@@ -234,6 +276,20 @@ export default function ListProperty() {
               <label style={lbl}>Price per night (₹) *</label>
               <input required type="number" min="500" style={{ ...inp, maxWidth: 240 }} placeholder="e.g. 12000" value={form.price} onChange={e => setForm({ ...form, price: e.target.value })} />
               <div style={{ fontSize: 12, color: theme.MUTED, marginTop: 6 }}>This is the base price. You can adjust it later from your dashboard.</div>
+            </div>
+
+            <div style={{ padding: 20, border: `1px solid ${theme.SAND}`, background: "#fff" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+                <ShieldCheck size={15} color={theme.SEA} />
+                <label style={{ ...lbl, marginBottom: 0 }}>Free Cancellation Window</label>
+              </div>
+              <div style={{ maxWidth: 260 }}>
+                <label style={lbl}>Hours before check-in</label>
+                <input type="number" min="0" style={inp} placeholder="24" value={form.free_cancellation_hours} onChange={e => setForm({ ...form, free_cancellation_hours: e.target.value })} />
+              </div>
+              <div style={{ fontSize: 12, color: theme.MUTED, marginTop: 8 }}>
+                Guests cancelling within this window before check-in won't receive an automatic full refund.
+              </div>
             </div>
 
             <div style={{ padding: 20, border: `1px solid ${theme.SAND}`, background: "#fff" }}>
@@ -339,7 +395,10 @@ export default function ListProperty() {
               <div style={{ padding: 32 }}>
                 <div style={{ fontSize: 11, letterSpacing: "0.2em", color: theme.SEA_DARK, textTransform: "uppercase", marginBottom: 8 }}>{form.tag}</div>
                 <h3 className="serif" style={{ fontSize: 32, fontWeight: 400, marginBottom: 4 }}>{form.name || "—"}</h3>
-                <div style={{ fontSize: 14, color: theme.MUTED, marginBottom: 20 }}>{form.city}, {form.state}</div>
+                <div style={{ fontSize: 14, color: theme.MUTED, marginBottom: 12 }}>{form.city}, {form.state}</div>
+                <div style={{ fontSize: 13, color: theme.INK, marginBottom: 20 }}>
+                  {form.max_guests} guests · {form.bedrooms} bedroom{Number(form.bedrooms) !== 1 ? "s" : ""} · {form.beds} bed{Number(form.beds) !== 1 ? "s" : ""} · {form.bathrooms} bathroom{Number(form.bathrooms) !== 1 ? "s" : ""}
+                </div>
                 <p style={{ fontSize: 14, lineHeight: 1.7, color: "#4A5856", marginBottom: 24 }}>{form.description}</p>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 16, marginBottom: 24 }}>
                   {[
@@ -353,6 +412,9 @@ export default function ListProperty() {
                       <div style={{ fontWeight: 600 }}>{item.value}</div>
                     </div>
                   ))}
+                </div>
+                <div style={{ fontSize: 12, color: theme.MUTED, marginBottom: form.amenities.length > 0 ? 16 : 0 }}>
+                  Free cancellation up to {form.free_cancellation_hours || 24} hours before check-in.
                 </div>
                 {form.amenities.length > 0 && (
                   <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>

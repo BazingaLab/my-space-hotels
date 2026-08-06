@@ -118,7 +118,9 @@ export const teamApi = {
 
 export const guestBookingApi = {
   detail: (id) => request(`/api/guest-bookings/${id}`),
-  cancel: (id, user_id) => request(`/api/guest-bookings/${id}/cancel`, { method: "POST", body: JSON.stringify({ user_id }) }),
+  // No longer takes a user_id param — the server now derives the caller's
+  // identity from the verified session token instead of trusting the body.
+  cancel: (id) => request(`/api/guest-bookings/${id}/cancel`, { method: "POST" }),
 };
 
 export const paymentsApi = {

@@ -9,6 +9,8 @@ import complaintsRoutes from "./routes/complaintsRoutes.js";
 import paymentRoutes, { webhook as razorpayWebhook } from "./routes/paymentRoutes.js";
 import bookingMgmtRoutes from "./routes/bookingMgmtRoutes.js";
 import walletRoutes from "./routes/walletRoutes.js";
+import reviewRoutes from "./routes/reviewRoutes.js";
+import guestBookingRoutes from "./routes/guestBookingRoutes.js";
 
 dotenv.config();
 
@@ -38,8 +40,15 @@ app.use("/api/complaints", complaintsRoutes);
 app.use("/api/payments", paymentRoutes);
 app.use("/api/booking-mgmt", bookingMgmtRoutes);
 app.use("/api/wallets", walletRoutes);
+app.use("/api/reviews", reviewRoutes);
+app.use("/api/guest-bookings", guestBookingRoutes);
 
+// 404 handler — must stay last among route mounts; Express matches in
+// registration order, so anything unmatched above falls through to here.
 app.use((req, res) => res.status(404).json({ message: "Route not found" }));
+
+// Central error handler — must be the very last app.use(). Express treats
+// this as an error handler specifically because it takes 4 arguments.
 app.use((err, req, res, next) => {
   console.error(err.stack);
   res.status(500).json({ message: err.message || "Server error" });
