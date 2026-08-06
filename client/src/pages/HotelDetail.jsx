@@ -232,7 +232,7 @@ export default function HotelDetail() {
             <span style={{ fontWeight: 600 }}>{hotel.rooms}</span>
           </div>
 
-          
+          <a
             href={`mailto:support@myspacehotels.in?subject=${encodeURIComponent(`Reporting listing: ${hotel.name} (${hotel.id})`)}`}
             style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, fontSize: 12, color: theme.MUTED, textDecoration: "underline" }}
           >
