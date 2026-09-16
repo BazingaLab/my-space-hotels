@@ -12,18 +12,30 @@ export default function Hotels() {
   const [filterTag, setFilterTag] = useState(searchParams.get("tag") || "");
 
   const city = searchParams.get("city") || "";
+  const checkIn = searchParams.get("check_in") || "";
+  const checkOut = searchParams.get("check_out") || "";
+  const guests = searchParams.get("guests") || "";
 
   useEffect(() => {
     setLoading(true);
     const params = {};
     if (city) params.city = city;
     if (filterTag) params.tag = filterTag;
+    // When dates are given, results are filtered to hotels that
+    // actually have inventory free for them (Section 13) — not just
+    // hotel.rooms > 0 — via the same canonical availability check every
+    // other screen uses.
+    if (checkIn && checkOut) { params.check_in = checkIn; params.check_out = checkOut; }
+    // A soft discovery filter (hotel.max_guests >= requested guests) —
+    // not a hard booking constraint; that's enforced separately at
+    // submit time regardless of how the guest got to the booking form.
+    if (guests) params.guests = guests;
 
     api.getHotels(params)
       .then(data => setHotels(data.hotels || []))
       .catch(err => setError(err.message))
       .finally(() => setLoading(false));
-  }, [city, filterTag]);
+  }, [city, filterTag, checkIn, checkOut, guests]);
 
   const tags = ["", "Heritage", "Beachfront", "Luxury", "Boutique", "Mountain"];
 
@@ -72,7 +84,7 @@ export default function Hotels() {
         </div>
       ) : (
         <div className="grid-1-mobile" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 32 }}>
-          {hotels.map(h => <HotelCard key={h.id} hotel={h} />)}
+          {hotels.map(h => <HotelCard key={h.id} hotel={h} checkIn={checkIn} checkOut={checkOut} />)}
         </div>
       )}
     </main>

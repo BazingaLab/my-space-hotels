@@ -1,5 +1,4 @@
 import { supabase } from "../config/supabase.js";
-import { postLedgerEntry, ensureWallet } from "./walletController.js";
 
 // A booking belongs to the caller if either its user_id matches the
 // verified session, or its guest_email matches the verified session's
@@ -72,31 +71,23 @@ export const cancel = async (req, res) => {
     const hoursUntil = (checkIn - today) / (1000 * 60 * 60);
     const fullRefund = hoursUntil >= freeWindow;
 
-    const { data: updated, error } = await supabase.from("bookings").update({
-      status: "cancelled",
-      cancelled_at: new Date().toISOString(),
-      cancellation_reason: "Cancelled by guest",
-      reimbursement: fullRefund ? Number(booking.total_price) : 0,
-      payment_status: fullRefund ? "refunded" : booking.payment_status,
-    }).eq("id", id).select().single();
-    if (error) throw error;
-
-    // Reverse the hotel's wallet credit for this booking — best-effort,
-    // never blocks the cancellation itself from succeeding.
-    try {
-      const wallet = await ensureWallet(booking.hotel_id);
-      const { data: creditEntry } = await supabase
-        .from("ledger_entries").select("amount")
-        .eq("ref_type", "booking").eq("ref_id", id).eq("direction", "credit")
-        .order("created_at", { ascending: false }).limit(1).single();
-      if (creditEntry) {
-        await postLedgerEntry({
-          walletId: wallet.id, amount: creditEntry.amount, direction: "debit",
-          refType: "cancellation", refId: id,
-          description: `Guest cancellation — booking ${id.slice(0, 8)}`,
-        });
-      }
-    } catch (e) { console.error("Wallet reversal failed:", e.message); }
+    // The status guard, the cancellation write, and the wallet reversal
+    // are one atomic call (rpc_cancel_booking, 21-financial-integrity.sql)
+    // — previously the reversal was best-effort (a swallowed try/catch),
+    // so a cancellation could go through while silently leaving the
+    // hotel's wallet still credited. This also makes double-clicking
+    // cancel a clean no-op-with-error instead of a double reversal.
+    const { data: updated, error } = await supabase.rpc("rpc_cancel_booking", {
+      p_booking_id: id,
+      p_reason: "Cancelled by guest",
+      p_reimbursement: fullRefund ? Number(booking.total_price) : 0,
+      p_new_payment_status: fullRefund ? "refunded" : booking.payment_status,
+      p_actor_id: req.user.id,
+    });
+    if (error) {
+      if (error.code === "MSH02") return res.status(400).json({ message: "Already cancelled" });
+      throw error;
+    }
 
     res.json({
       message: fullRefund

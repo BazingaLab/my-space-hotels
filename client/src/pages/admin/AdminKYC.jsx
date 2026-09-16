@@ -3,6 +3,7 @@ import AdminLayout from "./AdminLayout.jsx";
 import { theme } from "../../lib/theme.js";
 import { CheckCircle2, XCircle, Clock, Eye, X, Shield } from "lucide-react";
 import { useAuth } from "../../context/AuthContext.jsx";
+import { kycApi } from "../../lib/api.js";
 
 const DOC_LABELS = {
   aadhaar_front: "Aadhaar (Front)", aadhaar_back: "Aadhaar (Back)",
@@ -29,15 +30,13 @@ export default function AdminKYC() {
 
   const loadHotels = async () => {
     setLoading(true);
-    const res = await fetch(`${import.meta.env.VITE_API_URL}/api/kyc/pending`);
-    const data = await res.json();
+    const data = await kycApi.pending();
     setHotels(data.hotels || []);
     setLoading(false);
   };
 
   const loadDocs = async (hotelId) => {
-    const res = await fetch(`${import.meta.env.VITE_API_URL}/api/kyc/hotel/${hotelId}`);
-    const data = await res.json();
+    const data = await kycApi.byHotel(hotelId);
     setDocs(data.documents || []);
   };
 
@@ -45,11 +44,7 @@ export default function AdminKYC() {
   useEffect(() => { if (selected) loadDocs(selected.id); }, [selected]);
 
   const reviewDoc = async (docId, status, reason = null) => {
-    await fetch(`${import.meta.env.VITE_API_URL}/api/kyc/${docId}/verify`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status, rejection_reason: reason, reviewed_by: user?.id }),
-    });
+    await kycApi.verify(docId, status, reason, user?.id);
     await loadDocs(selected.id);
     await loadHotels();
     setRejectModal(null);

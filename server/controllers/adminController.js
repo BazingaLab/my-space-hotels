@@ -1,5 +1,6 @@
 import { supabase } from "../config/supabase.js";
 import { ensureWallet } from "./walletController.js";
+import { audit } from "../audit.js";
 
 // GET /api/admin/role/:user_id
 export const getUserRole = async (req, res) => {
@@ -31,6 +32,7 @@ export const promoteUser = async (req, res) => {
     if (hotel_id && role === "hotel_admin") {
       await supabase.from("hotels").update({ owner_id: user_id }).eq("id", hotel_id);
     }
+    await audit({ userId: req.user.id, userEmail: req.user.email, action: "promote", entityType: "user_role", entityId: user_id, afterData: data, metadata: { hotel_id } });
     res.json({ message: `User promoted to ${role}`, data });
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -175,6 +177,9 @@ export const adminCreateHotel = async (req, res) => {
     if (error) throw error;
     try { await ensureWallet(data.id); } catch (e) { console.error("Wallet create failed:", e.message); }
 
+    // afterData is the inserted hotel row only — never the temp password.
+    await audit({ userId: req.user.id, userEmail: req.user.email, action: "create", entityType: "hotel", entityId: data.id, afterData: data });
+
     res.status(201).json({ ...data, ownerCredentials: credentials, ownerProvisioningError: provisioningError });
   } catch (error) {
     res.status(400).json({ message: error.message });
@@ -207,6 +212,11 @@ export const adminUpdateHotel = async (req, res) => {
 
     const { data, error } = await supabase.from("hotels").update(patch).eq("id", req.params.id).select().single();
     if (error) throw error;
+
+    // Log the resulting row only — patch/data never carry owner_password,
+    // which is a write-only field, not a column that comes back from hotels.
+    await audit({ userId: req.user.id, userEmail: req.user.email, action: "update", entityType: "hotel", entityId: req.params.id, beforeData: existing, afterData: data });
+
     res.json({ ...data, ownerCredentials: credentials, ownerProvisioningError: provisioningError });
   } catch (error) {
     res.status(400).json({ message: error.message });
@@ -224,6 +234,9 @@ export const resetOwnerPassword = async (req, res) => {
     const { error } = await supabase.auth.admin.updateUserById(hotel.owner_id, { password });
     if (error) throw error;
 
+    // Never log the password itself — just that a reset happened, and for whom.
+    await audit({ userId: req.user.id, userEmail: req.user.email, action: "reset_owner_password", entityType: "hotel", entityId: req.params.id, metadata: { owner_email: hotel.owner_email } });
+
     res.json({ email: hotel.owner_email, tempPassword: password });
   } catch (error) {
     res.status(400).json({ message: error.message });
@@ -233,8 +246,10 @@ export const resetOwnerPassword = async (req, res) => {
 // DELETE /api/admin/hotels/:id — super_admin only.
 export const adminDeleteHotel = async (req, res) => {
   try {
+    const { data: existing } = await supabase.from("hotels").select("*").eq("id", req.params.id).single();
     const { error } = await supabase.from("hotels").delete().eq("id", req.params.id);
     if (error) throw error;
+    await audit({ userId: req.user.id, userEmail: req.user.email, action: "delete", entityType: "hotel", entityId: req.params.id, beforeData: existing });
     res.json({ message: "Hotel deleted" });
   } catch (error) {
     res.status(500).json({ message: error.message });

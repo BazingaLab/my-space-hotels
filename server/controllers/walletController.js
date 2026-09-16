@@ -7,38 +7,14 @@ import { audit } from "../audit.js";
 const GOOD_BIZ_TENURE_MONTHS = 6;
 const GOOD_BIZ_BOOKING_THRESHOLD = 20;
 
-// Core ledger primitive: post an entry and update cached balance atomically-ish.
-// direction: 'credit' (money INTO hotel wallet) | 'debit' (money OUT / settled)
-export async function postLedgerEntry({ walletId, amount, direction, refType, refId = null, utr = null, description = "", createdBy = null }) {
-  const { data: wallet, error: wErr } = await supabase
-    .from("wallet_accounts").select("*").eq("id", walletId).single();
-  if (wErr) throw wErr;
-
-  const current = Number(wallet.balance_cached || 0);
-  const delta = direction === "credit" ? Number(amount) : -Number(amount);
-  const balanceAfter = current + delta;
-
-  const { data: entry, error: eErr } = await supabase.from("ledger_entries").insert([{
-    wallet_id: walletId, amount: Number(amount), direction,
-    ref_type: refType, ref_id: refId, utr_number: utr,
-    description, balance_after: balanceAfter, created_by: createdBy,
-  }]).select().single();
-  if (eErr) throw eErr;
-
-  await supabase.from("wallet_accounts").update({ balance_cached: balanceAfter }).eq("id", walletId);
-  return entry;
-}
-
 // Ensure a hotel has a wallet; create if missing. Returns wallet.
+// Backed by rpc_ensure_wallet (21-financial-integrity.sql) — an atomic
+// upsert, so two concurrent first-ever financial events for a brand new
+// hotel can't both try to insert its wallet row and hit the
+// wallet_accounts.hotel_id unique constraint unhandled.
 export async function ensureWallet(hotelId) {
-  const { data: existing } = await supabase
-    .from("wallet_accounts").select("*").eq("hotel_id", hotelId).single();
-  if (existing) return existing;
-  const { data, error } = await supabase.from("wallet_accounts")
-    .insert([{ hotel_id: hotelId, balance_cached: 0, initial_balance: 0 }])
-    .select().single();
+  const { data, error } = await supabase.rpc("rpc_ensure_wallet", { p_hotel_id: hotelId });
   if (error) throw error;
-  await supabase.from("hotels").update({ wallet_id: data.id }).eq("id", hotelId);
   return data;
 }
 
@@ -72,31 +48,34 @@ export const getGoodBizEligibility = async (req, res) => {
 // Called when a booking is confirmed: credit hotel wallet with (total - commission)
 // at the hotel's manually-set rate — no automatic override. Good-biz eligibility
 // is stamped onto the booking as a flag only, for reporting.
+//
+// The eligibility check is a pure read (no state changes, no race to
+// worry about) and stays here in JS. The actual money-moving part —
+// compute commission, insert the ledger credit, update the wallet
+// balance, stamp the commission fields onto the booking — is ONE
+// atomic call to rpc_credit_booking_to_wallet (21-financial-integrity.sql).
+// That function is also idempotent: if this is called twice for the
+// same booking (e.g. verifyPayment and the Razorpay webhook both firing
+// for the same payment), the second call returns the original ledger
+// entry instead of crediting the hotel twice.
 export async function creditBookingToWallet(booking) {
   if (!booking?.hotel_id) return;
   const { data: hotel } = await supabase.from("hotels").select("commission_percent").eq("id", booking.hotel_id).single();
   const appliedPct = Number(hotel?.commission_percent || 0);
-  const gross = Number(booking.total_price || 0);
-  const commission = +(gross * appliedPct / 100).toFixed(2);
-  const net = +(gross - commission).toFixed(2);
 
   const { eligible, reason } = await checkGoodBizEligibility(booking.hotel_id);
 
-  const wallet = await ensureWallet(booking.hotel_id);
-  await postLedgerEntry({
-    walletId: wallet.id, amount: net, direction: "credit",
-    refType: "booking", refId: booking.id,
-    description: `Booking ${booking.id?.slice(0, 8)} — gross ₹${gross}, commission ₹${commission} (${appliedPct}%)`,
+  const { data: entry, error } = await supabase.rpc("rpc_credit_booking_to_wallet", {
+    p_booking_id: booking.id,
+    p_commission_percent: appliedPct,
+    p_eligible: eligible,
+    p_reason: reason,
   });
+  if (error) throw error;
 
-  await supabase.from("bookings").update({
-    commission_percent_applied: appliedPct,
-    commission_amount: commission,
-    commission_waived: eligible, // repurposed: "was good-biz eligible", not "was forced to 0"
-    commission_waiver_reason: reason,
-  }).eq("id", booking.id);
-
-  return { gross, commission, net, eligible };
+  const gross = Number(booking.total_price || 0);
+  const commission = +(gross * appliedPct / 100).toFixed(2);
+  return { gross, commission, net: Number(entry.amount), eligible };
 }
 
 // GET /api/wallets — all wallets (admin)
@@ -122,21 +101,32 @@ export const getHotelWallet = async (req, res) => {
   } catch (e) { res.status(500).json({ message: e.message }); }
 };
 
-// POST /api/wallets/settle — record a payout (debit) with UTR
+// POST /api/wallets/settle — record a payout (debit) with UTR.
+// The balance-sufficiency check and the UTR-dedup check both happen
+// INSIDE rpc_settle_wallet, under a lock on the wallet row — the
+// previous Node-level "check then insert" version of this check had
+// the exact TOCTOU gap that let two concurrent settle requests both
+// pass the check before either wrote (see 21-financial-integrity.sql).
 export const settle = async (req, res) => {
   try {
     const { hotel_id, amount, utr_number, description } = req.body;
     if (!hotel_id || !amount) return res.status(400).json({ message: "hotel_id and amount required" });
-    const wallet = await ensureWallet(hotel_id);
-    if (Number(amount) > Number(wallet.balance_cached)) {
-      return res.status(400).json({ message: "Settlement exceeds available balance" });
-    }
-    const entry = await postLedgerEntry({
-      walletId: wallet.id, amount, direction: "debit",
-      refType: "settlement", utr: utr_number,
-      description: description || "Settlement payout",
+
+    const { data: entry, error } = await supabase.rpc("rpc_settle_wallet", {
+      p_hotel_id: hotel_id,
+      p_amount: amount,
+      p_utr: utr_number || null,
+      p_description: description || null,
+      p_created_by: req.user?.id || null,
     });
-    await audit({ action: "settle", entityType: "wallet", entityId: wallet.id, metadata: { amount, utr_number } });
+    if (error) {
+      if (error.code === "MSH02") return res.status(400).json({ message: "Settlement exceeds available balance" });
+      if (error.code === "MSH03") return res.status(409).json({ message: "A settlement with this UTR has already been recorded for this hotel" });
+      if (error.code === "MSH01") return res.status(400).json({ message: error.message });
+      throw error;
+    }
+
+    await audit({ userId: req.user?.id, userEmail: req.user?.email, action: "settle", entityType: "wallet", entityId: entry.wallet_id, metadata: { amount, utr_number } });
     res.json({ message: "Settlement recorded", entry });
   } catch (e) { res.status(500).json({ message: e.message }); }
 };

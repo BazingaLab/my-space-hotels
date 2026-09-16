@@ -61,6 +61,10 @@ export default function SearchBar() {
     if (cityName) params.set("city", cityName);
     if (checkIn) params.set("check_in", checkIn);
     if (checkOut) params.set("check_out", checkOut);
+    // "4+ Guests" parses to 4 — treated as a minimum, matching a hotel
+    // whose max_guests is 4 or more.
+    const guestCount = parseInt(guests, 10);
+    if (guestCount) params.set("guests", guestCount);
     return params;
   };
 

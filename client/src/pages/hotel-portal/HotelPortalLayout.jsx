@@ -3,13 +3,14 @@ import { useAuth } from "../../context/AuthContext.jsx";
 import { useHotelPortal } from "../../context/HotelPortalContext.jsx";
 import { theme } from "../../lib/theme.js";
 import Logo from "../../components/Logo.jsx";
-import { LayoutDashboard, Building2, Image, CalendarCheck, Wallet, LogOut, ChevronRight, ExternalLink, PlusCircle, Check, ShieldCheck } from "lucide-react";
+import { LayoutDashboard, Building2, Image, CalendarCheck, Wallet, LogOut, ChevronRight, ExternalLink, PlusCircle, Check, ShieldCheck, CalendarClock } from "lucide-react";
 
 const navItems = [
   { path: "/hotel-portal", label: "Dashboard", icon: LayoutDashboard },
   { path: "/hotel-portal/property", label: "My Property", icon: Building2 },
   { path: "/hotel-portal/photos", label: "Photo Manager", icon: Image },
   { path: "/hotel-portal/bookings", label: "Bookings", icon: CalendarCheck },
+  { path: "/hotel-portal/availability", label: "Availability", icon: CalendarClock },
   { path: "/hotel-portal/wallet", label: "Wallet", icon: Wallet },
   { path: "/hotel-portal/kyc", label: "KYC Documents", icon: ShieldCheck },
 ];

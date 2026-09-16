@@ -16,6 +16,7 @@ import {
   Wallet,
   ShieldAlert,
   Briefcase,
+  CalendarClock,
 } from "lucide-react";
 
 import { useAuth } from "../../context/AuthContext.jsx";
@@ -67,6 +68,12 @@ const navSections = [
         label: "Bookings",
         icon: CalendarCheck,
         adminOnly: false,
+      },
+      {
+        path: "/admin/availability",
+        label: "Availability",
+        icon: CalendarClock,
+        adminOnly: true,
       },
       {
         path: "/admin/customers",

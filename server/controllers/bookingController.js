@@ -1,7 +1,7 @@
 import { supabase } from "../config/supabase.js";
 import { syncCustomerFromBooking } from "./customerController.js";
 import { creditBookingToWallet } from "./walletController.js";
-import { priceBooking } from "../utils/pricing.js";
+import { priceBooking, insertBookingAtomically } from "../utils/pricing.js";
 
 // POST /api/bookings
 export const createBooking = async (req, res) => {
@@ -20,26 +20,12 @@ export const createBooking = async (req, res) => {
     // priceBooking() handles both nightly and hourly pricing, GST, and
     // (for hourly) the availability check — kept in one shared place so
     // this and the Razorpay create-order path can never drift apart.
-    const priced = await priceBooking({ hotel_id, check_in, check_out, meal_plan, booking_type, slot_hours, start_time });
+    const priced = await priceBooking({ hotel_id, check_in, check_out, meal_plan, booking_type, slot_hours, start_time, guests });
 
-    const { data, error } = await supabase
-      .from("bookings")
-      .insert([{
-        hotel_id, guest_name, guest_email, guest_phone,
-        check_in: priced.checkInDate, check_out: priced.checkOutDate,
-        guests: guests || 2, nights: priced.nights,
-        total_price: priced.total_price,
-        gst_rate: priced.gstRate, gst_amount: priced.gstAmount, grand_total: priced.grandTotal,
-        meal_plan: priced.mealPlan, breakfast_price_applied: priced.breakfastPricePerNight,
-        booking_type: priced.bookingType, slot_hours: priced.slotHours,
-        checkin_datetime: priced.checkinDatetime, checkout_datetime: priced.checkoutDatetime,
-        status: "confirmed",
-        user_id: user_id || null,
-      }])
-      .select()
-      .single();
-
-    if (error) throw error;
+    const data = await insertBookingAtomically({
+      hotel_id, guest_name, guest_email, guest_phone, priced, guests,
+      status: "confirmed", user_id,
+    });
 
     // Auto-create / update CRM customer record — best-effort, never blocks
     // the booking itself from succeeding if this fails.

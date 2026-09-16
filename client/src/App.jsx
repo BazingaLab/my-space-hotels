@@ -68,7 +68,9 @@ import BookingsManager from "./pages/hotel-portal/BookingsManager.jsx";
 import WalletView from "./pages/hotel-portal/WalletView.jsx";
 import AddProperty from "./pages/hotel-portal/AddProperty.jsx";
 import KYCUpload from "./pages/hotel-portal/KYCUpload.jsx";
+import AvailabilityCalendar from "./pages/hotel-portal/AvailabilityCalendar.jsx";
 import AdminKYC from "./pages/admin/AdminKYC.jsx";
+import AdminAvailability from "./pages/admin/AdminAvailability.jsx";
 
 /* =========================
    INNER ROUTES
@@ -391,6 +393,24 @@ function AppRoutes() {
           element={
             <ProtectedRoute requireHotelAdmin>
               <BookingsManager />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/hotel-portal/availability"
+          element={
+            <ProtectedRoute requireHotelAdmin>
+              <AvailabilityCalendar />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/admin/availability"
+          element={
+            <ProtectedRoute requireAdmin>
+              <AdminAvailability />
             </ProtectedRoute>
           }
         />

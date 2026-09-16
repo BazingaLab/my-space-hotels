@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, useSearchParams, Link } from "react-router-dom";
 import { Check, ArrowRight, Coffee, Clock } from "lucide-react";
 import { theme } from "../lib/theme.js";
 import { api, paymentsApi } from "../lib/api.js";
@@ -22,11 +22,18 @@ const nowTimeStr = () => new Date().toTimeString().slice(0, 5);
 
 export default function Booking() {
   const { id } = useParams();
+  const [searchParams] = useSearchParams();
   const { user } = useAuth();
   const [hotel, setHotel] = useState(null);
+  // Pre-filled from the dates the guest already searched with, if any
+  // — the availability shown on the hotel detail page was computed for
+  // exactly these dates, so carrying them through avoids the guest
+  // re-entering them (and the atomic booking RPC re-checks them for
+  // real at submit time regardless — this is a convenience, not a
+  // second source of truth, per Section 9).
   const [form, setForm] = useState({
     guest_name: "", guest_email: "", guest_phone: "",
-    check_in: "", check_out: "", guests: 2,
+    check_in: searchParams.get("check_in") || "", check_out: searchParams.get("check_out") || "", guests: 2,
   });
   const [stayType, setStayType] = useState("nightly");
   const [slotHours, setSlotHours] = useState(4);
@@ -40,6 +47,27 @@ export default function Booking() {
   useEffect(() => {
     api.getHotelById(id).then(setHotel).catch(err => setError(err.message));
   }, [id]);
+
+  // Derived from the hotel's actual capacity, not a hardcoded 1-4 — falls
+  // back to 4 (the same default the max_guests column itself uses) for a
+  // missing, non-numeric, or non-positive value, so a bad/absent value
+  // never breaks the page. The backend re-validates guests against this
+  // same hotel regardless of what the dropdown shows (Section 8) — this
+  // is a UI convenience, not the authority.
+  const maxGuests = (() => {
+    const n = Number(hotel?.max_guests);
+    return Number.isFinite(n) && n >= 1 ? Math.floor(n) : 4;
+  })();
+  const guestOptions = Array.from({ length: maxGuests }, (_, i) => i + 1);
+
+  // If the hotel's capacity is lower than whatever's currently selected
+  // (the default is 2, or a stale value from switching hotels), clamp it
+  // down rather than leaving an out-of-range value silently selected.
+  useEffect(() => {
+    if (Number(form.guests) > maxGuests) {
+      setForm(f => ({ ...f, guests: maxGuests }));
+    }
+  }, [maxGuests]);
 
   useEffect(() => {
     if (user) {
@@ -288,7 +316,7 @@ export default function Booking() {
               <div>
                 <label style={labelStyle}>Guests</label>
                 <select style={fieldStyle} value={form.guests} onChange={e => setForm({...form, guests: e.target.value})}>
-                  <option value={1}>1</option><option value={2}>2</option><option value={3}>3</option><option value={4}>4</option>
+                  {guestOptions.map(n => <option key={n} value={n}>{n}</option>)}
                 </select>
               </div>
             </div>
@@ -305,7 +333,7 @@ export default function Booking() {
               <div>
                 <label style={labelStyle}>Guests</label>
                 <select style={fieldStyle} value={form.guests} onChange={e => setForm({...form, guests: e.target.value})}>
-                  <option value={1}>1</option><option value={2}>2</option><option value={3}>3</option><option value={4}>4</option>
+                  {guestOptions.map(n => <option key={n} value={n}>{n}</option>)}
                 </select>
               </div>
             </div>

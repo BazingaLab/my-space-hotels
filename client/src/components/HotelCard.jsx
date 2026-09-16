@@ -2,9 +2,15 @@ import { Link } from "react-router-dom";
 import { MapPin, Star, Wifi, Coffee, Waves, ArrowUpRight } from "lucide-react";
 import { theme } from "../lib/theme.js";
 
-export default function HotelCard({ hotel }) {
+export default function HotelCard({ hotel, checkIn, checkOut }) {
+  const dateQuery = checkIn && checkOut ? `?check_in=${checkIn}&check_out=${checkOut}` : "";
+  // Only ever a real number from the search's own availability check
+  // (Section 14 — no fake urgency copy, no scarcity claim that isn't
+  // backed by the canonical calculation).
+  const showAvailability = checkIn && checkOut && typeof hotel.available_rooms === "number";
+
   return (
-    <Link to={`/hotels/${hotel.id}`} className="card hover-lift" style={{
+    <Link to={`/hotels/${hotel.id}${dateQuery}`} className="card hover-lift" style={{
       textDecoration: "none", color: theme.INK, background: theme.CREAM, display: "block",
     }}>
       <div style={{ width: "100%", height: 320, overflow: "hidden", position: "relative" }}>
@@ -15,6 +21,14 @@ export default function HotelCard({ hotel }) {
           fontSize: 10, letterSpacing: "0.2em", textTransform: "uppercase",
           color: theme.SEA_DARK, fontWeight: 600,
         }}>{hotel.tag}</div>
+        {/* Real inventory count for the searched dates only — never a
+            manufactured "almost sold out" claim (Section 14). */}
+        {showAvailability && hotel.available_rooms <= 3 && (
+          <div style={{
+            position: "absolute", top: 16, right: 16, background: "#a33", color: "#fff", padding: "6px 14px",
+            fontSize: 10, letterSpacing: "0.15em", textTransform: "uppercase", fontWeight: 600,
+          }}>{hotel.available_rooms} room{hotel.available_rooms !== 1 ? "s" : ""} left</div>
+        )}
       </div>
       <div style={{ padding: 28 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>

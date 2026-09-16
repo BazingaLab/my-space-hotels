@@ -3,6 +3,7 @@ import HotelPortalLayout from "./HotelPortalLayout.jsx";
 import { useHotelPortal } from "../../context/HotelPortalContext.jsx";
 import { useAuth } from "../../context/AuthContext.jsx";
 import { supabase } from "../../lib/supabase.js";
+import { kycApi } from "../../lib/api.js";
 import { theme } from "../../lib/theme.js";
 import { Upload, CheckCircle2, XCircle, Clock, FileText, X, Eye } from "lucide-react";
 
@@ -32,8 +33,7 @@ export default function KYCUpload() {
 
   const loadDocs = async () => {
     if (!myHotel?.id) return;
-    const res = await fetch(`${import.meta.env.VITE_API_URL}/api/kyc/hotel/${myHotel.id}`);
-    const data = await res.json();
+    const data = await kycApi.byHotel(myHotel.id);
     setDocs(data.documents || []);
   };
   useEffect(() => { loadDocs(); }, [myHotel]);
@@ -53,12 +53,7 @@ export default function KYCUpload() {
       const { data: { publicUrl } } = supabase.storage.from("kyc-documents").getPublicUrl(path);
 
       // Save to DB via backend
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/kyc`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ hotel_id: myHotel.id, owner_id: user.id, doc_type: docType, file_url: publicUrl, file_name: file.name, file_size: file.size }),
-      });
-      if (!res.ok) throw new Error((await res.json()).message);
+      await kycApi.submit({ hotel_id: myHotel.id, owner_id: user.id, doc_type: docType, file_url: publicUrl, file_name: file.name, file_size: file.size });
       await loadDocs();
     } catch (e) { setError(`Upload failed: ${e.message}`); }
     finally { setUploading(u => ({ ...u, [docType]: false })); }

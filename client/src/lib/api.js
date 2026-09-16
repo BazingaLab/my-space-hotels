@@ -30,6 +30,10 @@ export const api = {
     return request(`/api/hotels${qs ? `?${qs}` : ""}`);
   },
   getHotelById: (id) => request(`/api/hotels/${id}`),
+  getHotelAvailability: (id, params = {}) => {
+    const qs = new URLSearchParams(params).toString();
+    return request(`/api/hotels/${id}/availability${qs ? `?${qs}` : ""}`);
+  },
   suggest: (q) => request(`/api/hotels/suggest?q=${encodeURIComponent(q)}`),
   getFeaturedHotels: () => request("/api/hotels/featured/list"),
   getPopularDestinations: () => request("/api/hotels/destinations/popular"),
@@ -103,6 +107,9 @@ export const bookingMgmtApi = {
   checkIn: (id) => request(`/api/booking-mgmt/${id}/checkin`, { method: "POST" }),
   checkOut: (id) => request(`/api/booking-mgmt/${id}/checkout`, { method: "POST" }),
   markNoShow: (id) => request(`/api/booking-mgmt/${id}/no-show`, { method: "POST" }),
+  // No UI wired to this yet (Phase 2.5 built the backend action only —
+  // a refund button is Phase 3 work), but the data-layer call is ready.
+  refund: (id, data) => request(`/api/booking-mgmt/${id}/refund`, { method: "POST", body: JSON.stringify(data) }),
 };
 
 export const teamApi = {
@@ -126,6 +133,23 @@ export const guestBookingApi = {
 export const paymentsApi = {
   createOrder: (data) => request("/api/payments/create-order", { method: "POST", body: JSON.stringify(data) }),
   verify: (data) => request("/api/payments/verify", { method: "POST", body: JSON.stringify(data) }),
+};
+
+export const kycApi = {
+  pending: () => request("/api/kyc/pending"),
+  byHotel: (hotelId) => request(`/api/kyc/hotel/${hotelId}`),
+  submit: (data) => request("/api/kyc", { method: "POST", body: JSON.stringify(data) }),
+  verify: (docId, status, reason, reviewedBy) => request(`/api/kyc/${docId}/verify`, {
+    method: "PATCH",
+    body: JSON.stringify({ status, rejection_reason: reason, reviewed_by: reviewedBy }),
+  }),
+};
+
+export const inventoryApi = {
+  calendar: (hotelId, startDate, endDate) => request(`/api/inventory/${hotelId}/calendar?start_date=${startDate}&end_date=${endDate}`),
+  listBlocks: (hotelId, includeInactive = false) => request(`/api/inventory/${hotelId}/blocks${includeInactive ? "?include_inactive=true" : ""}`),
+  createBlock: (hotelId, data) => request(`/api/inventory/${hotelId}/blocks`, { method: "POST", body: JSON.stringify(data) }),
+  deactivateBlock: (blockId) => request(`/api/inventory/blocks/${blockId}/deactivate`, { method: "POST" }),
 };
 
 export const reviewApi = {

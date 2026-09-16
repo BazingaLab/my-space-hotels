@@ -1,6 +1,5 @@
 import { supabase } from "../config/supabase.js";
 import { audit } from "../audit.js";
-import { postLedgerEntry, ensureWallet } from "./walletController.js";
 
 // Compute the lifecycle bucket a booking falls into based on today's date.
 // Used to keep statuses fresh without a cron job.
@@ -11,6 +10,18 @@ function deriveStatus(b) {
   if (ci > today) return "upcoming";
   if (co < today) return "closed";
   return "active";
+}
+
+// True if this user may act on this booking: super_admin always;
+// hotel_admin only if they own the hotel the booking belongs to. The
+// route can't check this by URL param (only a booking id is present),
+// so it's resolved here once the booking's hotel_id is known — this is
+// what stops a hotel_admin from cancelling/checking-in a booking that
+// belongs to a hotel they don't own just by guessing its id.
+async function canAccessBooking(booking, user) {
+  if (user.role === "super_admin") return true;
+  const { data: hotel } = await supabase.from("hotels").select("owner_id").eq("id", booking.hotel_id).single();
+  return hotel?.owner_id === user.id;
 }
 
 // GET /api/booking-mgmt?status=active|upcoming|closed|cancelled
@@ -35,6 +46,15 @@ export const list = async (req, res) => {
 // POST /api/booking-mgmt/:id/cancel
 // Cancels a booking and REVERSES the hotel's wallet credit (debit entry),
 // because that revenue is no longer earned. Optionally records a reimbursement.
+//
+// The status-guard, the cancellation write, and the wallet reversal are
+// now ONE atomic call (rpc_cancel_booking, 21-financial-integrity.sql) —
+// previously the wallet reversal was best-effort (wrapped in a
+// try/catch that only logged on failure), so a cancellation could
+// "succeed" while silently leaving the hotel's wallet still credited
+// for a stay that's no longer happening. Now either both land or
+// neither does, and calling this twice on the same booking is a clean
+// 400 rather than a double reversal.
 export const cancel = async (req, res) => {
   try {
     const { id } = req.params;
@@ -44,34 +64,21 @@ export const cancel = async (req, res) => {
       .from("bookings").select("*").eq("id", id).single();
     if (bErr) throw bErr;
     if (booking.status === "cancelled") return res.status(400).json({ message: "Already cancelled" });
+    if (!(await canAccessBooking(booking, req.user))) return res.status(403).json({ message: "You don't have permission to manage this booking" });
 
-    // Mark cancelled
-    const { data: updated, error } = await supabase.from("bookings").update({
-      status: "cancelled",
-      cancelled_at: new Date().toISOString(),
-      cancellation_reason: reason || null,
-      reimbursement: Number(reimbursement) || 0,
-      payment_status: Number(reimbursement) > 0 ? "refunded" : booking.payment_status,
-    }).eq("id", id).select().single();
-    if (error) throw error;
+    const { data: updated, error } = await supabase.rpc("rpc_cancel_booking", {
+      p_booking_id: id,
+      p_reason: reason || null,
+      p_reimbursement: Number(reimbursement) || 0,
+      p_new_payment_status: Number(reimbursement) > 0 ? "refunded" : booking.payment_status,
+      p_actor_id: req.user.id,
+    });
+    if (error) {
+      if (error.code === "MSH02") return res.status(400).json({ message: "Already cancelled" });
+      throw error;
+    }
 
-    // Reverse the wallet credit for this booking (find original credit amount)
-    try {
-      const wallet = await ensureWallet(booking.hotel_id);
-      const { data: creditEntry } = await supabase
-        .from("ledger_entries").select("amount")
-        .eq("ref_type", "booking").eq("ref_id", id).eq("direction", "credit")
-        .order("created_at", { ascending: false }).limit(1).single();
-      if (creditEntry) {
-        await postLedgerEntry({
-          walletId: wallet.id, amount: creditEntry.amount, direction: "debit",
-          refType: "cancellation", refId: id,
-          description: `Reversal — booking ${id.slice(0,8)} cancelled`,
-        });
-      }
-    } catch (e) { console.error("Wallet reversal failed:", e.message); }
-
-    await audit({ action: "cancel", entityType: "booking", entityId: id, beforeData: booking, afterData: updated, metadata: { reason } });
+    await audit({ userId: req.user.id, userEmail: req.user.email, action: "cancel", entityType: "booking", entityId: id, beforeData: booking, afterData: updated, metadata: { reason } });
     res.json({ message: "Booking cancelled", booking: updated });
   } catch (e) { res.status(500).json({ message: e.message }); }
 };
@@ -79,6 +86,12 @@ export const cancel = async (req, res) => {
 // POST /api/booking-mgmt/:id/transfer
 // Moves a booking to another hotel. Reverses the credit on the old hotel's
 // wallet and credits the new hotel (net of its commission).
+//
+// The booking's hotel_id change and both wallet adjustments are now ONE
+// atomic call (rpc_transfer_booking) — previously the booking was moved
+// first and the wallet adjustments were best-effort afterward, so a
+// failure partway through could leave hotel A credited for a booking
+// hotel B now owns, with no matching credit anywhere for B.
 export const transfer = async (req, res) => {
   try {
     const { id } = req.params;
@@ -92,41 +105,38 @@ export const transfer = async (req, res) => {
 
     const oldHotelId = booking.hotel_id;
 
-    // Update booking to new hotel, remembering where it came from
-    const { data: updated, error } = await supabase.from("bookings").update({
-      hotel_id: new_hotel_id,
-      transferred_from_hotel: oldHotelId,
-    }).eq("id", id).select().single();
-    if (error) throw error;
+    const { data: updated, error } = await supabase.rpc("rpc_transfer_booking", {
+      p_booking_id: id,
+      p_new_hotel_id: new_hotel_id,
+      p_actor_id: req.user.id,
+    });
+    if (error) {
+      if (error.code === "MSH02") return res.status(400).json({ message: error.message });
+      if (error.code === "MSH01") return res.status(404).json({ message: error.message });
+      throw error;
+    }
 
-    // Wallet adjustments: debit old hotel, credit new hotel (net of commission)
-    try {
-      const oldWallet = await ensureWallet(oldHotelId);
-      const { data: creditEntry } = await supabase
-        .from("ledger_entries").select("amount")
-        .eq("ref_type", "booking").eq("ref_id", id).eq("direction", "credit")
-        .order("created_at", { ascending: false }).limit(1).single();
-      if (creditEntry) {
-        await postLedgerEntry({ walletId: oldWallet.id, amount: creditEntry.amount, direction: "debit", refType: "transfer_out", refId: id, description: `Transfer out — booking ${id.slice(0,8)}` });
-      }
-      // Credit new hotel net of its commission
-      const { data: newHotel } = await supabase.from("hotels").select("commission_percent").eq("id", new_hotel_id).single();
-      const commissionPct = Number(newHotel?.commission_percent || 0);
-      const net = +(Number(booking.total_price) * (1 - commissionPct / 100)).toFixed(2);
-      const newWallet = await ensureWallet(new_hotel_id);
-      await postLedgerEntry({ walletId: newWallet.id, amount: net, direction: "credit", refType: "transfer_in", refId: id, description: `Transfer in — booking ${id.slice(0,8)}` });
-    } catch (e) { console.error("Transfer wallet adjust failed:", e.message); }
-
-    await audit({ action: "transfer", entityType: "booking", entityId: id, metadata: { from: oldHotelId, to: new_hotel_id } });
+    await audit({ userId: req.user.id, userEmail: req.user.email, action: "transfer", entityType: "booking", entityId: id, metadata: { from: oldHotelId, to: new_hotel_id } });
     res.json({ message: "Booking transferred", booking: updated });
   } catch (e) { res.status(500).json({ message: e.message }); }
 };
 
 // PATCH /api/booking-mgmt/:id
 // Update payment status/mode, discount, special request, etc.
+//
+// payment_status can NOT be set to 'refunded'/'partial' here — that
+// transition must always carry an actual wallet reversal with it, and
+// this generic PATCH has no way to do that safely (no amount, no
+// reference, no idempotency). Use POST /:id/refund instead, which
+// performs the ledger reversal and the status change as one atomic,
+// idempotent operation (see rpc_refund_booking, 23-refund-workflow.sql).
 export const update = async (req, res) => {
   try {
     const { id } = req.params;
+    if (["refunded", "partial"].includes(req.body.payment_status)) {
+      return res.status(400).json({ message: "Use POST /api/booking-mgmt/:id/refund to record a refund — payment_status can't be set to refunded/partial directly." });
+    }
+
     const allowed = ["payment_status", "payment_mode", "discount", "special_request", "guests"];
     const patch = {};
     for (const k of allowed) if (k in req.body) patch[k] = req.body[k];
@@ -136,6 +146,44 @@ export const update = async (req, res) => {
     await audit({ action: "update", entityType: "booking", entityId: id, afterData: data });
     res.json(data);
   } catch (e) { res.status(400).json({ message: e.message }); }
+};
+
+// POST /api/booking-mgmt/:id/refund
+// The ONLY way payment_status can become 'refunded'/'partial'. Amount,
+// reference (required — the idempotency key) and reason are all
+// caller-supplied; the actual wallet reversal, the reimbursement total,
+// and the resulting payment_status are computed and written atomically
+// by rpc_refund_booking (23-refund-workflow.sql). A booking can be
+// refunded without being cancelled (e.g. a service issue during a stay
+// that still happened), and can be refunded more than once — repeating
+// the SAME reference is rejected as a duplicate rather than double-
+// reversing the wallet.
+export const refund = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { amount, reference, reason } = req.body;
+    if (!amount || !reference) return res.status(400).json({ message: "amount and reference are required" });
+
+    const { data: booking, error: bErr } = await supabase.from("bookings").select("*").eq("id", id).single();
+    if (bErr) throw bErr;
+    if (!(await canAccessBooking(booking, req.user))) return res.status(403).json({ message: "You don't have permission to manage this booking" });
+
+    const { data: updated, error } = await supabase.rpc("rpc_refund_booking", {
+      p_booking_id: id,
+      p_amount: Number(amount),
+      p_reference: reference,
+      p_reason: reason || null,
+      p_actor_id: req.user.id,
+    });
+    if (error) {
+      if (error.code === "MSH03") return res.status(409).json({ message: error.message });
+      if (error.code === "MSH02" || error.code === "MSH01") return res.status(400).json({ message: error.message });
+      throw error;
+    }
+
+    await audit({ userId: req.user.id, userEmail: req.user.email, action: "refund", entityType: "booking", entityId: id, beforeData: booking, afterData: updated, metadata: { amount, reference, reason } });
+    res.json({ message: "Refund recorded", booking: updated });
+  } catch (e) { res.status(500).json({ message: e.message }); }
 };
 
 // GET /api/booking-mgmt/stats — counts per lifecycle bucket for KPI cards
@@ -163,11 +211,16 @@ export const checkIn = async (req, res) => {
     if (booking.status === "cancelled") return res.status(400).json({ message: "Booking is cancelled" });
     if (booking.checkin_status === "checked_in") return res.status(400).json({ message: "Already checked in" });
     if (booking.checkin_status === "checked_out") return res.status(400).json({ message: "Guest has already checked out" });
+    if (!(await canAccessBooking(booking, req.user))) return res.status(403).json({ message: "You don't have permission to manage this booking" });
 
+    // Guarded by checkin_status = 'not_arrived' so this only ever
+    // transitions the row once, even if two check-in requests for the
+    // same booking land at nearly the same time.
     const { data, error } = await supabase.from("bookings").update({
       checkin_status: "checked_in", checked_in_at: new Date().toISOString(),
-    }).eq("id", id).select().single();
+    }).eq("id", id).eq("checkin_status", booking.checkin_status || "not_arrived").select().maybeSingle();
     if (error) throw error;
+    if (!data) return res.status(400).json({ message: "Check-in status changed by another request — please refresh" });
 
     await audit({ action: "checkin", entityType: "booking", entityId: id, beforeData: booking, afterData: data });
     res.json(data);
@@ -181,11 +234,13 @@ export const checkOut = async (req, res) => {
     const { data: booking, error: bErr } = await supabase.from("bookings").select("*").eq("id", id).single();
     if (bErr) throw bErr;
     if (booking.checkin_status !== "checked_in") return res.status(400).json({ message: "Guest hasn't checked in yet" });
+    if (!(await canAccessBooking(booking, req.user))) return res.status(403).json({ message: "You don't have permission to manage this booking" });
 
     const { data, error } = await supabase.from("bookings").update({
       checkin_status: "checked_out", checked_out_at: new Date().toISOString(),
-    }).eq("id", id).select().single();
+    }).eq("id", id).eq("checkin_status", "checked_in").select().maybeSingle();
     if (error) throw error;
+    if (!data) return res.status(400).json({ message: "Check-in status changed by another request — please refresh" });
 
     await audit({ action: "checkout", entityType: "booking", entityId: id, beforeData: booking, afterData: data });
     res.json(data);
@@ -200,9 +255,12 @@ export const markNoShow = async (req, res) => {
     if (bErr) throw bErr;
     if (booking.status === "cancelled") return res.status(400).json({ message: "Booking is cancelled" });
     if (booking.checkin_status !== "not_arrived") return res.status(400).json({ message: "Guest has already checked in or checked out" });
+    if (!(await canAccessBooking(booking, req.user))) return res.status(403).json({ message: "You don't have permission to manage this booking" });
 
-    const { data, error } = await supabase.from("bookings").update({ checkin_status: "no_show" }).eq("id", id).select().single();
+    const { data, error } = await supabase.from("bookings").update({ checkin_status: "no_show" })
+      .eq("id", id).eq("checkin_status", "not_arrived").select().maybeSingle();
     if (error) throw error;
+    if (!data) return res.status(400).json({ message: "Check-in status changed by another request — please refresh" });
 
     await audit({ action: "no_show", entityType: "booking", entityId: id, beforeData: booking, afterData: data });
     res.json(data);

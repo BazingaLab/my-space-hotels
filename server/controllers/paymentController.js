@@ -2,7 +2,7 @@ import { supabase } from "../config/supabase.js";
 import { createOrder as createRazorpayOrder, verifyPaymentSignature, verifyWebhookSignature } from "../config/razorpay.js";
 import { syncCustomerFromBooking } from "./customerController.js";
 import { creditBookingToWallet } from "./walletController.js";
-import { priceBooking } from "../utils/pricing.js";
+import { priceBooking, insertBookingAtomically } from "../utils/pricing.js";
 
 async function onBookingConfirmed(booking) {
   try {
@@ -25,20 +25,13 @@ export const createOrderHandler = async (req, res) => {
       return res.status(400).json({ message: "Missing required fields" });
     }
 
-    const priced = await priceBooking({ hotel_id, check_in, check_out, meal_plan, booking_type, slot_hours, start_time });
+    const priced = await priceBooking({ hotel_id, check_in, check_out, meal_plan, booking_type, slot_hours, start_time, guests });
 
-    const { data: booking, error } = await supabase.from("bookings").insert([{
-      hotel_id, guest_name, guest_email, guest_phone,
-      check_in: priced.checkInDate, check_out: priced.checkOutDate,
-      guests: guests || 2, nights: priced.nights, total_price: priced.total_price,
-      gst_rate: priced.gstRate, gst_amount: priced.gstAmount, grand_total: priced.grandTotal,
-      meal_plan: priced.mealPlan, breakfast_price_applied: priced.breakfastPricePerNight,
-      booking_type: priced.bookingType, slot_hours: priced.slotHours,
-      checkin_datetime: priced.checkinDatetime, checkout_datetime: priced.checkoutDatetime,
+    const booking = await insertBookingAtomically({
+      hotel_id, guest_name, guest_email, guest_phone, priced, guests,
       status: "pending", payment_mode: "prepaid", payment_status: "pending",
-      special_request: special_request || null, user_id: user_id || null,
-    }]).select().single();
-    if (error) throw error;
+      special_request, user_id,
+    });
 
     const order = await createRazorpayOrder({
       amountRupees: priced.grandTotal,
@@ -82,11 +75,22 @@ export const verifyPayment = async (req, res) => {
       return res.status(400).json({ message: "Payment verification failed" });
     }
 
+    // Guarded by payment_status = 'pending' so this UPDATE only ever
+    // matches (and transitions) the row once — if the webhook already
+    // confirmed this exact booking a moment earlier, this matches zero
+    // rows instead of confirming/crediting it a second time. Postgres
+    // serializes concurrent UPDATEs to the same row, so this is race-free
+    // even if verify and the webhook land at almost the same instant.
     const { data: updated, error: updateError } = await supabase.from("bookings").update({
       status: "confirmed", payment_status: "paid",
       razorpay_payment_id, razorpay_signature,
-    }).eq("id", booking_id).select().single();
+    }).eq("id", booking_id).eq("payment_status", "pending").select().maybeSingle();
     if (updateError) throw updateError;
+
+    if (!updated) {
+      const { data: current } = await supabase.from("bookings").select("*").eq("id", booking_id).single();
+      return res.json({ message: "Booking confirmed", booking: current });
+    }
 
     await onBookingConfirmed(updated);
 
@@ -115,13 +119,17 @@ export const webhook = async (req, res) => {
     const { data: booking } = await supabase.from("bookings").select("*").eq("razorpay_order_id", orderId).single();
     if (!booking) return res.json({ status: "ok" });
 
-    if (event === "payment.captured" && booking.status !== "confirmed") {
+    if (event === "payment.captured") {
+      // Same guarded-update idempotency as verifyPayment — Razorpay
+      // retries webhooks on timeout, and verifyPayment may have already
+      // confirmed this booking a moment earlier; either way this only
+      // transitions (and credits) the booking once.
       const { data: updated } = await supabase.from("bookings").update({
         status: "confirmed", payment_status: "paid", razorpay_payment_id: paymentEntity?.id,
-      }).eq("id", booking.id).select().single();
+      }).eq("id", booking.id).eq("payment_status", "pending").select().maybeSingle();
       if (updated) await onBookingConfirmed(updated);
-    } else if (event === "payment.failed" && booking.status !== "confirmed") {
-      await supabase.from("bookings").update({ payment_status: "failed" }).eq("id", booking.id);
+    } else if (event === "payment.failed" && booking.payment_status === "pending") {
+      await supabase.from("bookings").update({ payment_status: "failed" }).eq("id", booking.id).eq("payment_status", "pending");
     }
 
     res.json({ status: "ok" });

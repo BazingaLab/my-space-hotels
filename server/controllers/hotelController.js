@@ -1,9 +1,10 @@
 import { supabase } from "../config/supabase.js";
+import { computeAvailability, computeBookingWindow } from "../utils/availability.js";
 
 // GET /api/hotels - list with optional filters
 export const getHotels = async (req, res) => {
   try {
-    const { city, featured, tag, minPrice, maxPrice, search, limit } = req.query;
+    const { city, featured, tag, minPrice, maxPrice, search, limit, check_in, check_out, guests } = req.query;
 
     let query = supabase.from("hotels").select("*").eq("available", true);
 
@@ -13,14 +14,78 @@ export const getHotels = async (req, res) => {
     if (minPrice) query = query.gte("price", Number(minPrice));
     if (maxPrice) query = query.lte("price", Number(maxPrice));
     if (search) query = query.or(`name.ilike.%${search}%,city.ilike.%${search}%,state.ilike.%${search}%`);
-    if (limit) query = query.limit(Number(limit));
+    // A discovery filter, not a hard capacity rule — hides hotels that
+    // can't fit the party size at all. Booking submission independently
+    // re-validates guest count against the specific hotel regardless.
+    if (guests) query = query.gte("max_guests", Number(guests));
+    // When dates are given, availability filtering below may drop some
+    // candidates, so the row limit is applied after that, not here.
+    if (limit && !(check_in && check_out)) query = query.limit(Number(limit));
 
     query = query.order("rating", { ascending: false });
 
     const { data, error } = await query;
     if (error) throw error;
 
-    res.json({ count: data.length, hotels: data });
+    let hotels = data;
+
+    // A hotel showing up in search must actually have inventory for the
+    // requested dates — hotel.rooms > 0 is not availability (Section 13).
+    // Checked via the same canonical calculation everything else uses,
+    // one call per candidate, in parallel.
+    if (check_in && check_out && check_out > check_in) {
+      const withAvailability = await Promise.all(hotels.map(async (h) => {
+        try {
+          const { start, end } = computeBookingWindow({ booking_type: "nightly", check_in, check_out }, h);
+          const avail = await computeAvailability({ hotelId: h.id, windowStart: start, windowEnd: end });
+          return { ...h, available_rooms: avail.available };
+        } catch {
+          // Don't let one hotel's lookup failure hide it from results —
+          // fall back to "unknown" rather than silently excluding it.
+          return { ...h, available_rooms: null };
+        }
+      }));
+      hotels = withAvailability.filter(h => h.available_rooms === null || h.available_rooms > 0);
+      if (limit) hotels = hotels.slice(0, Number(limit));
+    }
+
+    res.json({ count: hotels.length, hotels });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// GET /api/hotels/:id/availability — the canonical availability check,
+// exposed for the guest-facing UI (hotel detail / booking page) to show
+// a real number instead of hotel.rooms (Section 14: no scarcity claim
+// without a real backend calculation behind it). Same calculation the
+// search filter above, rpc_create_booking, the owner calendar, and the
+// admin view all use.
+export const getHotelAvailability = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { check_in, check_out, booking_type, start_time, slot_hours } = req.query;
+    if (!check_in) return res.status(400).json({ message: "check_in is required" });
+
+    const { data: hotel, error: hErr } = await supabase
+      .from("hotels").select("rooms, checkin_time, checkout_time").eq("id", id).single();
+    if (hErr || !hotel) return res.status(404).json({ message: "Hotel not found" });
+
+    let start, end;
+    if (booking_type === "hourly") {
+      if (!start_time || !slot_hours) return res.status(400).json({ message: "start_time and slot_hours are required for hourly availability" });
+      start = new Date(`${check_in}T${start_time}:00`);
+      end = new Date(start.getTime() + Number(slot_hours) * 60 * 60 * 1000);
+    } else {
+      if (!check_out) return res.status(400).json({ message: "check_out is required" });
+      ({ start, end } = computeBookingWindow({ booking_type: "nightly", check_in, check_out }, hotel));
+    }
+    if (isNaN(start?.getTime()) || isNaN(end?.getTime()) || end <= start) {
+      return res.status(400).json({ message: "Invalid dates" });
+    }
+
+    const avail = await computeAvailability({ hotelId: id, windowStart: start, windowEnd: end });
+    res.json(avail);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

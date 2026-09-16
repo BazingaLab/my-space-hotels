@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, useSearchParams, Link } from "react-router-dom";
 import {
   MapPin, Star, ArrowRight, Check, X, ChevronLeft, ChevronRight, Share2,
   Wifi, Snowflake, Car, Waves, Sparkles, UtensilsCrossed, Wine,
@@ -19,11 +19,15 @@ const AMENITY_ICONS = {
 
 export default function HotelDetail() {
   const { id } = useParams();
+  const [searchParams] = useSearchParams();
+  const checkIn = searchParams.get("check_in") || "";
+  const checkOut = searchParams.get("check_out") || "";
   const [hotel, setHotel] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [lightboxIndex, setLightboxIndex] = useState(null);
   const [shareCopied, setShareCopied] = useState(false);
+  const [availability, setAvailability] = useState(null);
 
   useEffect(() => {
     api.getHotelById(id)
@@ -31,6 +35,15 @@ export default function HotelDetail() {
       .catch(err => setError(err.message))
       .finally(() => setLoading(false));
   }, [id]);
+
+  // Only fetched (and only ever shown) when real dates are known — the
+  // canonical backend calculation, not hotel.rooms (Section 14).
+  useEffect(() => {
+    if (!checkIn || !checkOut) { setAvailability(null); return; }
+    api.getHotelAvailability(id, { check_in: checkIn, check_out: checkOut })
+      .then(setAvailability)
+      .catch(() => setAvailability(null));
+  }, [id, checkIn, checkOut]);
 
   const images = hotel?.images?.length ? hotel.images : hotel?.cover_image ? [hotel.cover_image] : [];
 
@@ -215,7 +228,19 @@ export default function HotelDetail() {
           </div>
           <div style={{ fontSize: 13, color: theme.MUTED, marginBottom: 28 }}>per night — GST calculated at checkout</div>
 
-          <Link to={`/book/${hotel.id}`} className="cta-btn" style={{
+          {availability && (
+            <div style={{
+              padding: "10px 14px", marginBottom: 20, fontSize: 13,
+              background: availability.available > 0 ? "#E8F5F3" : "#FFF0F0",
+              color: availability.available > 0 ? theme.SEA_DARK : "#a33",
+            }}>
+              {availability.available > 0
+                ? `${availability.available} of ${availability.total} rooms available for these dates`
+                : "Sold out for these dates"}
+            </div>
+          )}
+
+          <Link to={`/book/${hotel.id}${checkIn && checkOut ? `?check_in=${checkIn}&check_out=${checkOut}` : ""}`} className="cta-btn" style={{
             display: "flex", justifyContent: "center", alignItems: "center", gap: 10,
             background: theme.SEA, color: theme.CREAM, padding: 18, textDecoration: "none",
             fontSize: 13, letterSpacing: "0.15em", textTransform: "uppercase", fontWeight: 500, marginBottom: 20,
@@ -228,7 +253,10 @@ export default function HotelDetail() {
           </div>
 
           <div style={{ paddingTop: 20, borderTop: `1px solid ${theme.SAND}`, display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 20 }}>
-            <span style={{ color: theme.MUTED }}>Rooms available</span>
+            {/* Total capacity, not "available" — this hotel's real
+                availability for specific dates is the banner above,
+                only ever shown once dates are actually known. */}
+            <span style={{ color: theme.MUTED }}>Total rooms</span>
             <span style={{ fontWeight: 600 }}>{hotel.rooms}</span>
           </div>
 
