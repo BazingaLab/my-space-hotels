@@ -67,7 +67,7 @@ export async function priceBooking({ hotel_id, check_in, check_out, meal_plan, b
     if (![4, 6].includes(Number(slot_hours))) throw new Error("Invalid slot duration");
     if (!check_in || !start_time) throw new Error("Missing date or start time");
 
-    const checkinDatetime = new Date(`${check_in}T${start_time}:00`);
+    const checkinDatetime = new Date(`${check_in}T${start_time}:00Z`); // UTC-anchored — see availability.js nightlyWindow() for why
     if (isNaN(checkinDatetime.getTime())) throw new Error("Invalid date or time");
     if (checkinDatetime <= new Date()) throw new Error("Start time must be in the future");
 

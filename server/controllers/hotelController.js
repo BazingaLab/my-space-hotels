@@ -74,7 +74,7 @@ export const getHotelAvailability = async (req, res) => {
     let start, end;
     if (booking_type === "hourly") {
       if (!start_time || !slot_hours) return res.status(400).json({ message: "start_time and slot_hours are required for hourly availability" });
-      start = new Date(`${check_in}T${start_time}:00`);
+      start = new Date(`${check_in}T${start_time}:00Z`); // UTC-anchored — see availability.js nightlyWindow() for why
       end = new Date(start.getTime() + Number(slot_hours) * 60 * 60 * 1000);
     } else {
       if (!check_out) return res.status(400).json({ message: "check_out is required" });
@@ -98,7 +98,7 @@ export const getHotelById = async (req, res) => {
       .from("hotels")
       .select("*")
       .eq("id", req.params.id)
-      .single();
+      .maybeSingle();
 
     if (error) throw error;
     if (!data) return res.status(404).json({ message: "Hotel not found" });

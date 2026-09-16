@@ -10,9 +10,16 @@ function nightlyWindow(booking, hotel) {
   // shapes end up as "HH:MM" before the ":00" seconds suffix is appended.
   const checkinTime = (hotel.checkin_time || "14:00").slice(0, 5);
   const checkoutTime = (hotel.checkout_time || "11:00").slice(0, 5);
+  // "Z" anchors this to UTC explicitly — without it, new Date() parses
+  // the string in the RUNNING PROCESS's local timezone, while Postgres
+  // (rpc_create_booking / fn_compute_availability) parses the exact same
+  // "HH:MM" against EXISTING bookings using ITS session timezone (UTC on
+  // Supabase). Those two interpretations only agree by accident when the
+  // Node process itself happens to run in UTC — true on Vercel, false on
+  // a non-UTC dev machine, where this silently miscomputes overlaps.
   return {
-    start: new Date(`${booking.check_in}T${checkinTime}:00`),
-    end: new Date(`${booking.check_out}T${checkoutTime}:00`),
+    start: new Date(`${booking.check_in}T${checkinTime}:00Z`),
+    end: new Date(`${booking.check_out}T${checkoutTime}:00Z`),
   };
 }
 function bookingWindow(booking, hotel) {
