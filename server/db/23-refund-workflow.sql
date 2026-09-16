@@ -97,7 +97,11 @@ begin
 
   update bookings set
     reimbursement = v_already_refunded + p_amount,
-    payment_status = case when v_already_refunded + p_amount >= v_booking.total_price then 'refunded' else 'partial' end
+    -- Same grand_total basis as the overflow cap above — comparing
+    -- against total_price here let a booking flip to 'refunded' once
+    -- the pre-tax amount was reimbursed while the GST portion was
+    -- still outstanding. Found during the Phase 7 re-audit.
+    payment_status = case when v_already_refunded + p_amount >= v_booking.grand_total then 'refunded' else 'partial' end
   where id = p_booking_id
   returning * into v_booking;
 

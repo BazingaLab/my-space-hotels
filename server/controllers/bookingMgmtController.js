@@ -1,5 +1,13 @@
 import { supabase } from "../config/supabase.js";
 import { audit } from "../audit.js";
+import { createRefund } from "../config/razorpay.js";
+
+// A booking only goes through the real Razorpay refund path when there's
+// an actual captured payment to refund — pay-at-hotel bookings, goodwill
+// credits with no payment behind them, or bookings that were never
+// actually captured all fall through to the original bookkeeping-only
+// rpc_refund_booking path, unchanged.
+const RAZORPAY_REFUND_ELIGIBLE_STATUSES = ["paid", "partial"];
 
 // Compute the lifecycle bucket a booking falls into based on today's date.
 // Used to keep statuses fresh without a cron job.
@@ -158,31 +166,97 @@ export const update = async (req, res) => {
 // that still happened), and can be refunded more than once — repeating
 // the SAME reference is rejected as a duplicate rather than double-
 // reversing the wallet.
+async function commitBookkeepingRefund({ id, amount, reference, reason, actorId }) {
+  const { data: updated, error } = await supabase.rpc("rpc_refund_booking", {
+    p_booking_id: id,
+    p_amount: Number(amount),
+    p_reference: reference,
+    p_reason: reason || null,
+    p_actor_id: actorId,
+  });
+  return { updated, error };
+}
+
 export const refund = async (req, res) => {
   try {
     const { id } = req.params;
     const { amount, reference, reason } = req.body;
     if (!amount || !reference) return res.status(400).json({ message: "amount and reference are required" });
+    if (Number(amount) <= 0) return res.status(400).json({ message: "Refund amount must be positive" });
 
     const { data: booking, error: bErr } = await supabase.from("bookings").select("*").eq("id", id).single();
     if (bErr) throw bErr;
     if (!(await canAccessBooking(booking, req.user))) return res.status(403).json({ message: "You don't have permission to manage this booking" });
 
-    const { data: updated, error } = await supabase.rpc("rpc_refund_booking", {
-      p_booking_id: id,
-      p_amount: Number(amount),
-      p_reference: reference,
-      p_reason: reason || null,
-      p_actor_id: req.user.id,
-    });
-    if (error) {
-      if (error.code === "MSH03") return res.status(409).json({ message: error.message });
-      if (error.code === "MSH02" || error.code === "MSH01") return res.status(400).json({ message: error.message });
-      throw error;
+    const usesRazorpay = booking.payment_mode === "prepaid"
+      && !!booking.razorpay_payment_id
+      && RAZORPAY_REFUND_ELIGIBLE_STATUSES.includes(booking.payment_status);
+
+    if (!usesRazorpay) {
+      // Pay-at-hotel / goodwill / never-actually-captured — unchanged
+      // bookkeeping-only path, exactly as before Phase 7.
+      const { updated, error } = await commitBookkeepingRefund({ id, amount, reference, reason, actorId: req.user.id });
+      if (error) {
+        if (error.code === "MSH03") return res.status(409).json({ message: error.message });
+        if (error.code === "MSH02" || error.code === "MSH01") return res.status(400).json({ message: error.message });
+        throw error;
+      }
+      await audit({ userId: req.user.id, userEmail: req.user.email, action: "refund", entityType: "booking", entityId: id, beforeData: booking, afterData: updated, metadata: { amount, reference, reason } });
+      return res.json({ message: "Refund recorded", booking: updated, razorpay_refund_id: null });
     }
 
-    await audit({ userId: req.user.id, userEmail: req.user.email, action: "refund", entityType: "booking", entityId: id, beforeData: booking, afterData: updated, metadata: { amount, reference, reason } });
-    res.json({ message: "Refund recorded", booking: updated });
+    // ---- Real Razorpay refund, two-phase ----
+    // Phase 1: reserve the attempt. Dedups on (booking_id, reference)
+    // BEFORE Razorpay is ever called — a retried/duplicated request
+    // with the same reference never reaches the gateway twice.
+    const { data: attempt, error: reserveErr } = await supabase.rpc("rpc_reserve_refund_attempt", {
+      p_booking_id: id,
+      p_razorpay_payment_id: booking.razorpay_payment_id,
+      p_amount: Number(amount),
+      p_reference: reference,
+      p_actor_id: req.user.id,
+    });
+    if (reserveErr) {
+      if (reserveErr.code === "MSH03") return res.status(409).json({ message: "This refund reference has already been used for this booking" });
+      if (reserveErr.code === "MSH02" || reserveErr.code === "MSH01") return res.status(400).json({ message: reserveErr.message });
+      throw reserveErr;
+    }
+
+    // Phase 2: call Razorpay. Any rejection (invalid payment id, amount
+    // exceeds what's refundable, already refunded on Razorpay's side,
+    // network/gateway failure) lands here — nothing local has moved yet.
+    let razorpayRefund;
+    try {
+      razorpayRefund = await createRefund({ paymentId: booking.razorpay_payment_id, amountRupees: Number(amount), reference, reason });
+    } catch (gatewayErr) {
+      await supabase.from("razorpay_refund_attempts")
+        .update({ status: "failed", error_detail: gatewayErr.message, updated_at: new Date().toISOString() })
+        .eq("id", attempt.id);
+      return res.status(502).json({ message: `Razorpay refund failed: ${gatewayErr.message}` });
+    }
+
+    // Phase 3: commit the existing, already-tested bookkeeping RPC.
+    const { updated, error: commitErr } = await commitBookkeepingRefund({ id, amount, reference, reason, actorId: req.user.id });
+    if (commitErr) {
+      // Razorpay succeeded but the local write failed — never silently
+      // drop this. The attempt row is the auditable trail: it already
+      // has the amount/reference/booking, now also the real Razorpay
+      // refund id, flagged as needing manual reconciliation.
+      await supabase.from("razorpay_refund_attempts")
+        .update({ status: "gateway_succeeded_local_failed", razorpay_refund_id: razorpayRefund.id, error_detail: commitErr.message, updated_at: new Date().toISOString() })
+        .eq("id", attempt.id);
+      console.error(`RECONCILIATION REQUIRED: Razorpay refund ${razorpayRefund.id} succeeded for booking ${id} (attempt ${attempt.id}) but local bookkeeping failed: ${commitErr.message}`);
+      return res.status(500).json({
+        message: `The refund was processed by Razorpay (ref ${razorpayRefund.id}) but could not be recorded internally. This has been flagged for manual reconciliation.`,
+        razorpay_refund_id: razorpayRefund.id,
+      });
+    }
+
+    await supabase.from("razorpay_refund_attempts")
+      .update({ status: "completed", razorpay_refund_id: razorpayRefund.id, updated_at: new Date().toISOString() })
+      .eq("id", attempt.id);
+    await audit({ userId: req.user.id, userEmail: req.user.email, action: "refund", entityType: "booking", entityId: id, beforeData: booking, afterData: updated, metadata: { amount, reference, reason, razorpay_refund_id: razorpayRefund.id } });
+    res.json({ message: "Refund processed via Razorpay", booking: updated, razorpay_refund_id: razorpayRefund.id });
   } catch (e) { res.status(500).json({ message: e.message }); }
 };
 

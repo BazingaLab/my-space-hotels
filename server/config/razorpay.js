@@ -88,3 +88,54 @@ export function verifyWebhookSignature({ rawBody, signature }) {
 
 }
 
+// Issues a real refund against an actual captured payment (not the
+// order) — Razorpay refunds are always addressed by payment id.
+// amountRupees may be less than the full captured amount (Razorpay
+// supports partial refunds natively); omitting it there would refund
+// the full remaining captured amount, so this always sends an
+// explicit amount. Razorpay itself rejects amounts exceeding what's
+// still refundable on that payment, and rejects an unknown/invalid
+// payment id — both surface here as a thrown Error the caller must
+// handle without assuming the refund happened.
+export async function createRefund({ paymentId, amountRupees, reference, reason }) {
+  const res = await fetch(`${BASE_URL}/payments/${paymentId}/refund`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: authHeader() },
+    body: JSON.stringify({
+      amount: Math.round(Number(amountRupees) * 100),
+      speed: "normal",
+      notes: { reference, reason: reason || "" },
+    }),
+  });
+  // Some rejections (e.g. a payment id that doesn't even match Razorpay's
+  // id format) come back with an empty body rather than JSON — guard the
+  // parse so that still surfaces as a clean handled error, not a crash.
+  const text = await res.text();
+  let data = null;
+  try { data = text ? JSON.parse(text) : null; } catch { /* leave null — status text below still explains what failed */ }
+  if (!res.ok) {
+    // Razorpay's error shape is usually {error: {description, code}}, but
+    // some rejections (e.g. a payment id that doesn't match their id
+    // format at all) come back as a flat {message} instead — check both
+    // so the real reason surfaces instead of a generic fallback.
+    const err = new Error(data?.error?.description || data?.message || `Razorpay refund failed (HTTP ${res.status})`);
+    err.razorpayError = data?.error || data;
+    throw err;
+  }
+  return data;
+}
+
+// Lists refunds Razorpay already has on record for a payment — used as
+// a defense-in-depth check independent of our own local bookkeeping.
+export async function getPaymentRefunds({ paymentId }) {
+  const res = await fetch(`${BASE_URL}/payments/${paymentId}/refunds`, {
+    method: "GET",
+    headers: { Authorization: authHeader() },
+  });
+  const text = await res.text();
+  let data = null;
+  try { data = text ? JSON.parse(text) : null; } catch { /* leave null */ }
+  if (!res.ok) throw new Error(data?.error?.description || data?.message || `Failed to fetch existing refunds (HTTP ${res.status})`);
+  return data;
+}
+
