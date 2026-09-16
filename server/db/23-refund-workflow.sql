@@ -69,9 +69,14 @@ begin
   end if;
 
   v_already_refunded := coalesce(v_booking.reimbursement, 0);
-  if v_already_refunded + p_amount > v_booking.total_price then
+  -- Capped against grand_total (what the guest actually paid, GST
+  -- included), not total_price (the pre-tax base) — capping against
+  -- total_price made it impossible to ever fully refund a
+  -- GST-inclusive booking, since grand_total > total_price whenever
+  -- GST applies. Found via Phase 6 staging verification.
+  if v_already_refunded + p_amount > v_booking.grand_total then
     raise exception 'Refund would exceed the booking total (already refunded %, requested %, total %)',
-      v_already_refunded, p_amount, v_booking.total_price using errcode = 'MSH02';
+      v_already_refunded, p_amount, v_booking.grand_total using errcode = 'MSH02';
   end if;
 
   v_commission_pct := coalesce(v_booking.commission_percent_applied, 0);

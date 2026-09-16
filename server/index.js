@@ -74,6 +74,13 @@ app.use((req, res) => res.status(404).json({ message: "Route not found" }));
 // Central error handler — must be the very last app.use(). Express treats
 // this as an error handler specifically because it takes 4 arguments.
 app.use((err, req, res, next) => {
+  // express.json() rejects unparseable request bodies by passing a
+  // SyntaxError here (marked with .type "entity.parse.failed") — that's
+  // a bad request from the client, not a server fault, so it should be
+  // a 400, not fall through to the generic 500 below.
+  if (err.type === "entity.parse.failed") {
+    return res.status(400).json({ message: "Malformed JSON in request body" });
+  }
   console.error(err.stack);
   res.status(500).json({ message: err.message || "Server error" });
 });
