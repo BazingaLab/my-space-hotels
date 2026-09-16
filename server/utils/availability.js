@@ -5,8 +5,11 @@ import { supabase } from "../config/supabase.js";
 // same defaults used everywhere else in this app); hourly bookings use their
 // exact stored timestamps.
 function nightlyWindow(booking, hotel) {
-  const checkinTime = hotel.checkin_time || "14:00";
-  const checkoutTime = hotel.checkout_time || "11:00";
+  // Postgres `time` columns round-trip through PostgREST as "HH:MM:SS",
+  // not the "HH:MM" the fallback defaults below use — slice(0, 5) so both
+  // shapes end up as "HH:MM" before the ":00" seconds suffix is appended.
+  const checkinTime = (hotel.checkin_time || "14:00").slice(0, 5);
+  const checkoutTime = (hotel.checkout_time || "11:00").slice(0, 5);
   return {
     start: new Date(`${booking.check_in}T${checkinTime}:00`),
     end: new Date(`${booking.check_out}T${checkoutTime}:00`),
