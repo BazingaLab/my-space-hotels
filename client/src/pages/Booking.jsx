@@ -126,7 +126,7 @@ export default function Booking() {
     try {
       const bookingPayload = stayType === "hourly"
         ? { hotel_id: id, ...form, guests: Number(form.guests), user_id: user?.id || null, booking_type: "hourly", slot_hours: slotHours, start_time: startTime }
-        : { hotel_id: id, ...form, guests: Number(form.guests), user_id: user?.id || null, meal_plan };
+        : { hotel_id: id, ...form, guests: Number(form.guests), user_id: user?.id || null, meal_plan: mealPlan };
 
       if (paymentMode === "pay_at_hotel") {
         const res = await api.createBooking(bookingPayload);
