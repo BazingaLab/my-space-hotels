@@ -84,6 +84,10 @@ export const customersApi = {
   get: (id) => request(`/api/customers/${id}`),
   update: (id, patch) => request(`/api/customers/${id}`, { method: "PATCH", body: JSON.stringify(patch) }),
   stats: () => request("/api/customers/stats/summary"),
+  // The caller's own CRM record (name/phone/tier/loyalty points) — for
+  // the guest account page. Never takes an id; the server derives "me"
+  // from the verified session.
+  me: () => request("/api/customers/me"),
 };
 
 export const walletsApi = {
@@ -104,7 +108,7 @@ export const bookingMgmtApi = {
   cancel: (id, data) => request(`/api/booking-mgmt/${id}/cancel`, { method: "POST", body: JSON.stringify(data) }),
   transfer: (id, new_hotel_id) => request(`/api/booking-mgmt/${id}/transfer`, { method: "POST", body: JSON.stringify({ new_hotel_id }) }),
   update: (id, patch) => request(`/api/booking-mgmt/${id}`, { method: "PATCH", body: JSON.stringify(patch) }),
-  checkIn: (id) => request(`/api/booking-mgmt/${id}/checkin`, { method: "POST" }),
+  checkIn: (id, token) => request(`/api/booking-mgmt/${id}/checkin`, { method: "POST", body: JSON.stringify({ token }) }),
   checkOut: (id) => request(`/api/booking-mgmt/${id}/checkout`, { method: "POST" }),
   markNoShow: (id) => request(`/api/booking-mgmt/${id}/no-show`, { method: "POST" }),
   // No UI wired to this yet (Phase 2.5 built the backend action only —

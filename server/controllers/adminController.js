@@ -1,6 +1,7 @@
 import { supabase } from "../config/supabase.js";
 import { ensureWallet } from "./walletController.js";
 import { audit } from "../audit.js";
+import { isValidEmail, isValidPhone } from "../utils/validation.js";
 
 // GET /api/admin/role/:user_id
 export const getUserRole = async (req, res) => {
@@ -157,6 +158,12 @@ function stripAdminOnlyFields(body, role) {
 export const adminCreateHotel = async (req, res) => {
   try {
     const hotel = { ...req.body, images: req.body.images || [], amenities: req.body.amenities || [] };
+    if (hotel.contact_number && !isValidPhone(hotel.contact_number)) {
+      return res.status(400).json({ message: "Contact number doesn't look valid — use 10-15 digits, optionally with a country code." });
+    }
+    if (hotel.owner_email && !isValidEmail(hotel.owner_email)) {
+      return res.status(400).json({ message: "Owner email doesn't look valid." });
+    }
     const ownerPassword = hotel.owner_password;
     delete hotel.owner_password;
 
@@ -193,6 +200,12 @@ export const adminUpdateHotel = async (req, res) => {
     if (fetchErr) throw fetchErr;
 
     const patch = { ...stripAdminOnlyFields(req.body, req.user.role), updated_at: new Date().toISOString() };
+    if (patch.contact_number && !isValidPhone(patch.contact_number)) {
+      return res.status(400).json({ message: "Contact number doesn't look valid — use 10-15 digits, optionally with a country code." });
+    }
+    if (patch.owner_email && !isValidEmail(patch.owner_email)) {
+      return res.status(400).json({ message: "Owner email doesn't look valid." });
+    }
     const ownerPassword = req.user.role === "super_admin" ? req.body.owner_password : null;
 
     let credentials = null;

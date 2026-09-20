@@ -8,6 +8,7 @@ import {
   suggestHotels,
   createHotel,
   getHotelAvailability,
+  getSitemap,
 } from "../controllers/hotelController.js";
 
 const router = express.Router();
@@ -16,6 +17,9 @@ router.get("/", getHotels);
 router.get("/featured/list", getFeaturedHotels);
 router.get("/destinations/popular", getPopularDestinations);
 router.get("/suggest", suggestHotels);
+// Must be registered before the /:id routes below, or Express would match
+// "sitemap.xml" as an :id value instead.
+router.get("/sitemap.xml", getSitemap);
 router.get("/:id/availability", getHotelAvailability);
 router.get("/:id", getHotelById);
 

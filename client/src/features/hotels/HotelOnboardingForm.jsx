@@ -6,6 +6,7 @@ import { supabase } from "../../lib/supabase.js";
 import { Save, Building2, User, FileText, MapPin, Clock, IndianRupee, Landmark, Upload, Image as ImageIcon, KeyRound, Star, Coffee } from "lucide-react";
 import AddressInput from "../../shared/components/AddressInput.jsx";
 import LocationPicker from "../../shared/components/LocationPicker.jsx";
+import { isValidEmail, isValidPhone } from "../../lib/validation.js";
 
 const HOTEL_TYPES = ["Budget", "Premium", "Resort"];
 const TAGS = ["Heritage", "Beachfront", "Boutique", "Hotel", "Resort", "BnB"];
@@ -98,6 +99,16 @@ export default function HotelOnboardingForm({ initial = null, onSaved }) {
 
     if (f.owner_password && f.owner_password.trim().length < 6) {
       setError("Owner password must be at least 6 characters — or leave it blank to auto-generate one.");
+      setSaving(false);
+      return;
+    }
+    if (f.contact_number && !isValidPhone(f.contact_number)) {
+      setError("Contact number doesn't look valid — use 10-15 digits, optionally with a country code.");
+      setSaving(false);
+      return;
+    }
+    if (f.owner_email && !isValidEmail(f.owner_email)) {
+      setError("Owner email doesn't look valid.");
       setSaving(false);
       return;
     }

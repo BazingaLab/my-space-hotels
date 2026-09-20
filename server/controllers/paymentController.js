@@ -1,8 +1,19 @@
+import crypto from "crypto";
 import { supabase } from "../config/supabase.js";
 import { createOrder as createRazorpayOrder, verifyPaymentSignature, verifyWebhookSignature } from "../config/razorpay.js";
 import { syncCustomerFromBooking } from "./customerController.js";
 import { creditBookingToWallet } from "./walletController.js";
 import { priceBooking, insertBookingAtomically } from "../utils/pricing.js";
+import { sendEmail, bookingConfirmationEmail } from "../services/emailService.js";
+
+// 6-digit numeric code — easy for a guest to read aloud/type at the front
+// desk, not a security secret in the same sense as a password (the booking
+// itself is already access-controlled; this only proves "the person
+// checking in is the one who paid"). crypto.randomInt is used anyway for
+// an unbiased, non-guessable-in-bulk distribution over Math.random().
+function generateCheckinToken() {
+  return String(crypto.randomInt(0, 1_000_000)).padStart(6, "0");
+}
 
 async function onBookingConfirmed(booking) {
   try {
@@ -12,6 +23,25 @@ async function onBookingConfirmed(booking) {
 
   try { await creditBookingToWallet(booking); }
   catch (e) { console.error("Wallet credit failed:", e.message); }
+
+  // Only prepaid bookings get a check-in token — a pay-at-hotel guest
+  // settles up and identifies themselves at the desk directly, there's
+  // nothing this token would add for them. Generated once: this function
+  // only ever runs on the single guarded transition into 'paid'.
+  let checkinToken = booking.checkin_token;
+  if (booking.payment_mode === "prepaid" && !checkinToken) {
+    checkinToken = generateCheckinToken();
+    try { await supabase.from("bookings").update({ checkin_token: checkinToken }).eq("id", booking.id); }
+    catch (e) { console.error("Check-in token generation failed:", e.message); }
+  }
+
+  // Best-effort, same as the two above — see services/emailService.js for
+  // why this can't fake success without a real provider configured.
+  try {
+    const { data: hotel } = await supabase.from("hotels").select("name").eq("id", booking.hotel_id).single();
+    const { subject, html } = bookingConfirmationEmail({ ...booking, checkin_token: checkinToken }, hotel);
+    await sendEmail({ to: booking.guest_email, subject, html });
+  } catch (e) { console.error("Booking confirmation email failed:", e.message); }
 }
 
 // POST /api/payments/create-order

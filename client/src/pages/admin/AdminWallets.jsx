@@ -4,7 +4,16 @@ import DataTable from "../../shared/components/DataTable.jsx";
 import KPICard from "../../shared/components/KPICard.jsx";
 import { useWallets, useWalletSummary, useHotelWallet, useSettle } from "../../features/wallets/hooks.jsx";
 import { theme } from "../../lib/theme.js";
-import { Wallet, IndianRupee, Building2, X, ArrowDownToLine } from "lucide-react";
+import { exportToCsv } from "../../lib/csvExport.js";
+import { Wallet, IndianRupee, Building2, X, ArrowDownToLine, Download } from "lucide-react";
+
+const WALLET_CSV_COLUMNS = [
+  { key: "hotel_id", label: "Hotel ID" },
+  { key: "hotels.name", label: "Hotel Name" },
+  { key: "hotels.city", label: "City" },
+  { key: "hotels.commission_percent", label: "Commission %" },
+  { key: "balance_cached", label: "Balance Payable" },
+];
 
 export default function AdminWallets() {
   const { data, isLoading } = useWallets();
@@ -43,6 +52,16 @@ export default function AdminWallets() {
         <KPICard label="Total Payable" value={`₹${Number(summary?.totalPayable || 0).toLocaleString("en-IN")}`} icon={IndianRupee} color={theme.SEA} />
         <KPICard label="Active Wallets" value={summary?.walletCount ?? "—"} icon={Wallet} color={theme.INK} />
         <KPICard label="Hotels" value={wallets.length} icon={Building2} color="#7C6AF5" />
+      </div>
+
+      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 16 }}>
+        <button onClick={() => exportToCsv("wallets", wallets, WALLET_CSV_COLUMNS)} disabled={!wallets.length} style={{
+          display: "flex", alignItems: "center", gap: 8, background: "transparent", border: `1px solid ${theme.SAND}`,
+          padding: "8px 16px", fontSize: 12, letterSpacing: "0.1em", textTransform: "uppercase",
+          cursor: wallets.length ? "pointer" : "not-allowed", color: theme.INK, opacity: wallets.length ? 1 : 0.5,
+        }}>
+          <Download size={14} /> Export CSV
+        </button>
       </div>
 
       <DataTable data={wallets} columns={columns} searchPlaceholder="Search hotel..." isLoading={isLoading} emptyMessage="No wallets yet" pageSize={15} />

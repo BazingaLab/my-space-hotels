@@ -2,6 +2,7 @@ import { supabase } from "../config/supabase.js";
 import { syncCustomerFromBooking } from "./customerController.js";
 import { creditBookingToWallet } from "./walletController.js";
 import { priceBooking, insertBookingAtomically } from "../utils/pricing.js";
+import { sendEmail, bookingConfirmationEmail } from "../services/emailService.js";
 
 // POST /api/bookings
 export const createBooking = async (req, res) => {
@@ -41,6 +42,16 @@ export const createBooking = async (req, res) => {
     try { await creditBookingToWallet(data); }
     catch (e) { console.error("Wallet credit failed:", e.message); }
 
+    // Booking confirmation email — best-effort, same as the two above. No
+    // real provider is configured in this environment (see
+    // services/emailService.js); this logs a clear warning and continues
+    // rather than blocking or faking delivery.
+    try {
+      const { data: hotel } = await supabase.from("hotels").select("name").eq("id", hotel_id).single();
+      const { subject, html } = bookingConfirmationEmail(data, hotel);
+      await sendEmail({ to: data.guest_email, subject, html });
+    } catch (e) { console.error("Booking confirmation email failed:", e.message); }
+
     res.status(201).json({ message: "Booking confirmed", booking: data });
   } catch (error) {
     res.status(400).json({ message: error.message });
@@ -54,6 +65,9 @@ export const createBooking = async (req, res) => {
 // reviewed. Empty array = not reviewed yet.
 export const getBookingsByEmail = async (req, res) => {
   try {
+    if (req.user.role !== "super_admin" && req.params.email.toLowerCase() !== (req.user.email || "").toLowerCase()) {
+      return res.status(403).json({ message: "You can only look up your own bookings" });
+    }
     const { data, error } = await supabase
       .from("bookings")
       .select("*, hotels!hotel_id(name, city, cover_image), reviews(id, rating)")
@@ -74,6 +88,9 @@ export const getBookingsByEmail = async (req, res) => {
 export const getBookingsByUser = async (req, res) => {
   try {
     const { userId } = req.params;
+    if (req.user.role !== "super_admin" && req.user.id !== userId) {
+      return res.status(403).json({ message: "You can only look up your own bookings" });
+    }
 
     // Step 1: get the account email (service role can access auth.admin)
     const { data: { user }, error: authErr } = await supabase.auth.admin.getUserById(userId);

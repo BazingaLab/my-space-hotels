@@ -52,6 +52,24 @@ export async function syncCustomerFromBooking(booking) {
   }
 }
 
+// GET /api/customers/me — the CALLER's own CRM record (name/phone/tier/
+// loyalty points), matched by their verified session email, never by an
+// id in the request — a guest account page needs this, but must never be
+// able to look up anyone else's record through it. No customer row exists
+// until a guest's first booking is confirmed (syncCustomerFromBooking),
+// so a guest with no bookings yet gets sensible zeroed defaults instead
+// of a 404 — an account page should render for them too.
+export const getMyProfile = async (req, res) => {
+  try {
+    const email = (req.user.email || "").toLowerCase().trim();
+    const { data } = await supabase.from("customers").select("*").eq("email", email).single();
+    res.json(data || {
+      name: null, email, phone: null, classification: "Basic",
+      total_bookings: 0, total_spent: 0, loyalty_points: 0,
+    });
+  } catch (e) { res.status(500).json({ message: e.message }); }
+};
+
 // GET /api/customers
 export const list = async (req, res) => {
   try {

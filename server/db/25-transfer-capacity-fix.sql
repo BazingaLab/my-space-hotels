@@ -132,6 +132,22 @@ begin
         format('Transfer in - booking %s', left(p_booking_id::text, 8)), p_actor_id);
     exception when unique_violation then null;
     end;
+
+    -- The wallet credit above already correctly uses the DESTINATION
+    -- hotel's commission rate — but bookings.commission_percent_applied/
+    -- commission_amount were never updated to match, so any report
+    -- reading those columns directly (walletController.commissionReport)
+    -- kept showing the SOURCE hotel's stale rate/amount for a transferred
+    -- booking, even though the money itself moved correctly. Only done
+    -- here (inside "if found") because this only matters for a booking
+    -- that was already credited before the transfer — one transferred
+    -- before ever being paid picks up the destination's rate naturally
+    -- when it's credited later, same as any other booking.
+    update bookings set
+      commission_percent_applied = v_new_commission,
+      commission_amount = round(coalesce(v_booking.total_price, 0) * coalesce(v_new_commission, 0) / 100.0, 2)
+      where id = p_booking_id
+      returning * into v_booking;
   end if;
 
   return v_booking;

@@ -6,7 +6,26 @@ import KPICard from "../../shared/components/KPICard.jsx";
 import { useManagedBookings, useBookingStats, useCancelBooking, useTransferBooking, useUpdateBooking } from "../../features/bookings/hooks.jsx";
 import { adminApi } from "../../lib/api.js";
 import { theme } from "../../lib/theme.js";
-import { CalendarCheck, Clock, CheckCircle2, XCircle, IndianRupee, X, ArrowRightLeft, Ban } from "lucide-react";
+import { exportToCsv } from "../../lib/csvExport.js";
+import { CalendarCheck, Clock, CheckCircle2, XCircle, IndianRupee, X, ArrowRightLeft, Ban, Download } from "lucide-react";
+
+const BOOKING_CSV_COLUMNS = [
+  { key: "id", label: "Booking ID" },
+  { key: "guest_name", label: "Guest Name" },
+  { key: "guest_email", label: "Guest Email" },
+  { key: "hotels.name", label: "Hotel" },
+  { key: "check_in", label: "Check In" },
+  { key: "check_out", label: "Check Out" },
+  { key: "guests", label: "Guests" },
+  { key: "nights", label: "Nights" },
+  { key: "liveStatus", label: "Status" },
+  { key: "payment_status", label: "Payment Status" },
+  { key: "payment_mode", label: "Payment Mode" },
+  { key: "total_price", label: "Total Price" },
+  { key: "grand_total", label: "Grand Total" },
+  { key: "reimbursement", label: "Reimbursement" },
+  { key: "created_at", label: "Created At" },
+];
 
 export default function AdminBookingLifecycle() {
   const [tab, setTab] = useState("");
@@ -77,11 +96,20 @@ export default function AdminBookingLifecycle() {
         <KPICard label="Revenue" value={`₹${Number(stats?.revenue || 0).toLocaleString("en-IN")}`} icon={IndianRupee} color={theme.INK} />
       </div>
 
-      <div style={{ display: "flex", gap: 8, marginBottom: 24 }}>
-        {tabs.map(t => {
-          const active = tab === t.key;
-          return <button key={t.key || "all"} onClick={() => setTab(t.key)} style={{ padding: "8px 18px", border: `1px solid ${active ? theme.INK : theme.SAND}`, background: active ? theme.INK : "transparent", color: active ? theme.CREAM : theme.INK, fontSize: 12, letterSpacing: "0.1em", textTransform: "uppercase", cursor: "pointer" }}>{t.label}</button>;
-        })}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24, flexWrap: "wrap", gap: 12 }}>
+        <div style={{ display: "flex", gap: 8 }}>
+          {tabs.map(t => {
+            const active = tab === t.key;
+            return <button key={t.key || "all"} onClick={() => setTab(t.key)} style={{ padding: "8px 18px", border: `1px solid ${active ? theme.INK : theme.SAND}`, background: active ? theme.INK : "transparent", color: active ? theme.CREAM : theme.INK, fontSize: 12, letterSpacing: "0.1em", textTransform: "uppercase", cursor: "pointer" }}>{t.label}</button>;
+          })}
+        </div>
+        <button onClick={() => exportToCsv("bookings", bookings, BOOKING_CSV_COLUMNS)} disabled={!bookings.length} style={{
+          display: "flex", alignItems: "center", gap: 8, background: "transparent", border: `1px solid ${theme.SAND}`,
+          padding: "8px 16px", fontSize: 12, letterSpacing: "0.1em", textTransform: "uppercase",
+          cursor: bookings.length ? "pointer" : "not-allowed", color: theme.INK, opacity: bookings.length ? 1 : 0.5,
+        }}>
+          <Download size={14} /> Export CSV
+        </button>
       </div>
 
       <DataTable data={bookings} columns={columns} searchPlaceholder="Search guest..." isLoading={isLoading} emptyMessage="No bookings" pageSize={15} />

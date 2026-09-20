@@ -27,6 +27,7 @@ import Booking from "./pages/Booking.jsx";
 import Login from "./pages/Login.jsx";
 import Signup from "./pages/Signup.jsx";
 import MyBookings from "./pages/MyBookings.jsx";
+import Account from "./pages/Account.jsx";
 import BookingDetail from "./pages/BookingDetail.jsx";
 import AuthCallback from "./pages/hotel-portal/AuthCallback.jsx";
 import ListProperty from "./pages/ListProperty.jsx";
@@ -160,6 +161,15 @@ function AppRoutes() {
           element={
             <ProtectedRoute>
               <MyBookings />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/account"
+          element={
+            <ProtectedRoute>
+              <Account />
             </ProtectedRoute>
           }
         />

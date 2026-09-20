@@ -9,6 +9,7 @@ import {
 import { theme } from "../lib/theme.js";
 import { api } from "../lib/api.js";
 import MapPreview from "../shared/components/MapPreview.jsx";
+import { useDocumentMeta, useJsonLd } from "../lib/useDocumentMeta.js";
 
 const AMENITY_ICONS = {
   WiFi: Wifi, AC: Snowflake, Parking: Car, Pool: Waves, Spa: Sparkles,
@@ -46,6 +47,28 @@ export default function HotelDetail() {
   }, [id, checkIn, checkOut]);
 
   const images = hotel?.images?.length ? hotel.images : hotel?.cover_image ? [hotel.cover_image] : [];
+
+  useDocumentMeta({
+    title: hotel ? `${hotel.name} — ${hotel.city} | My Space Hotels` : undefined,
+    description: hotel ? (hotel.short_description || hotel.description || `Book ${hotel.name} in ${hotel.city}, ${hotel.state} on My Space Hotels.`) : undefined,
+    image: hotel?.cover_image || images[0],
+  });
+  useJsonLd(hotel ? {
+    "@context": "https://schema.org",
+    "@type": "LodgingBusiness",
+    name: hotel.name,
+    description: hotel.short_description || hotel.description,
+    image: images,
+    address: {
+      "@type": "PostalAddress",
+      addressLocality: hotel.city,
+      addressRegion: hotel.state,
+      addressCountry: hotel.country || "IN",
+    },
+    ...(hotel.latitude && hotel.longitude ? { geo: { "@type": "GeoCoordinates", latitude: hotel.latitude, longitude: hotel.longitude } } : {}),
+    ...(hotel.rating_avg ? { aggregateRating: { "@type": "AggregateRating", ratingValue: hotel.rating_avg, reviewCount: hotel.rating_count || hotel.review_count || 0 } } : {}),
+    priceRange: `₹${hotel.price}`,
+  } : null);
 
   useEffect(() => {
     if (lightboxIndex === null) return;
@@ -114,7 +137,7 @@ export default function HotelDetail() {
         <div className="grid-1-mobile" style={{
           display: "grid",
           gridTemplateColumns: thumbnails.length > 0 ? "2fr 1fr" : "1fr",
-          gap: 12, marginBottom: 24, height: 480,
+          gap: 12, marginBottom: 24, height: 480, overflow: "hidden",
         }}>
           <div onClick={() => setLightboxIndex(0)} style={{ cursor: "pointer", overflow: "hidden", borderRadius: 4 }}>
             <img src={images[0]} alt={hotel.name} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />

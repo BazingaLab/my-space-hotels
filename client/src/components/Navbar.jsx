@@ -337,6 +337,24 @@ export default function Navbar() {
                   My Bookings
                 </Link>
 
+                {/* MY ACCOUNT */}
+                <Link
+                  to="/account"
+                  onClick={() => setDropdownOpen(false)}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 10,
+                    padding: "14px 20px",
+                    textDecoration: "none",
+                    color: theme.INK,
+                    fontSize: 13,
+                    borderBottom: `1px solid ${theme.SAND}`,
+                  }}
+                >
+                  My Account
+                </Link>
+
                 {/* HOTEL DASHBOARD */}
                 {showHotelDashboard && (
                   <Link

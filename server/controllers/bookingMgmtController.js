@@ -220,6 +220,7 @@ export const stats = async (req, res) => {
 export const checkIn = async (req, res) => {
   try {
     const { id } = req.params;
+    const { token } = req.body || {};
     const { data: booking, error: bErr } = await supabase.from("bookings").select("*").eq("id", id).single();
     if (bErr) throw bErr;
     if (booking.status === "cancelled") return res.status(400).json({ message: "Booking is cancelled" });
@@ -227,11 +228,25 @@ export const checkIn = async (req, res) => {
     if (booking.checkin_status === "checked_out") return res.status(400).json({ message: "Guest has already checked out" });
     if (!(await canAccessBooking(booking, req.user))) return res.status(403).json({ message: "You don't have permission to manage this booking" });
 
+    // Only prepaid bookings ever have a checkin_token (see
+    // paymentController.onBookingConfirmed) — pay-at-hotel bookings, and
+    // any booking confirmed before this feature existed, have none and
+    // check in exactly as before. Where one exists, front desk must have
+    // the guest's actual code — this is what makes verification
+    // server-authoritative rather than a front-end-only display.
+    if (booking.checkin_token && booking.checkin_token !== token) {
+      return res.status(400).json({ message: "Incorrect or missing check-in code" });
+    }
+
     // Guarded by checkin_status = 'not_arrived' so this only ever
     // transitions the row once, even if two check-in requests for the
-    // same booking land at nearly the same time.
+    // same booking land at nearly the same time — this is also what
+    // makes the token effectively one-time-use: once this succeeds, no
+    // later request (with or without the right token) can check in this
+    // booking again.
     const { data, error } = await supabase.from("bookings").update({
       checkin_status: "checked_in", checked_in_at: new Date().toISOString(),
+      ...(booking.checkin_token ? { checkin_token_verified_at: new Date().toISOString() } : {}),
     }).eq("id", id).eq("checkin_status", booking.checkin_status || "not_arrived").select().maybeSingle();
     if (error) throw error;
     if (!data) return res.status(400).json({ message: "Check-in status changed by another request — please refresh" });

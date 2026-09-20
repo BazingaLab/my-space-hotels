@@ -36,7 +36,23 @@ export default function BookingsManager() {
     }
   };
 
-  const handleMark = async (bookingId, action) => {
+  const handleMark = async (booking, action) => {
+    const bookingId = booking.id;
+    if (action === "checkin" && booking.checkin_token) {
+      const entered = window.prompt("Enter the guest's 6-digit check-in code:");
+      if (entered === null) return; // cancelled
+      setMarking(bookingId);
+      try {
+        await bookingMgmtApi.checkIn(bookingId, entered.trim());
+        load();
+      } catch (err) {
+        console.error(err);
+        alert(err.message);
+      } finally {
+        setMarking(null);
+      }
+      return;
+    }
     setMarking(bookingId);
     try {
       if (action === "checkin") await bookingMgmtApi.checkIn(bookingId);
@@ -168,12 +184,12 @@ export default function BookingsManager() {
                         <span style={{ background: cs.bg, color: cs.color, padding: "4px 12px", fontSize: 11, letterSpacing: "0.1em", textTransform: "uppercase", whiteSpace: "nowrap" }}>{cs.label}</span>
                         {b.status !== "cancelled" && (b.checkin_status || "not_arrived") === "not_arrived" && (
                           <>
-                            <button title="Check in" disabled={isMarking} onClick={() => handleMark(b.id, "checkin")} style={{ ...iconBtn, color: theme.SEA_DARK }}><LogIn size={15} /></button>
-                            <button title="Mark no-show" disabled={isMarking} onClick={() => handleMark(b.id, "no-show")} style={{ ...iconBtn, color: "#a33" }}><UserX size={15} /></button>
+                            <button title="Check in" disabled={isMarking} onClick={() => handleMark(b, "checkin")} style={{ ...iconBtn, color: theme.SEA_DARK }}><LogIn size={15} /></button>
+                            <button title="Mark no-show" disabled={isMarking} onClick={() => handleMark(b, "no-show")} style={{ ...iconBtn, color: "#a33" }}><UserX size={15} /></button>
                           </>
                         )}
                         {b.checkin_status === "checked_in" && (
-                          <button title="Check out" disabled={isMarking} onClick={() => handleMark(b.id, "checkout")} style={{ ...iconBtn, color: "#4A4FA0" }}><LogOut size={15} /></button>
+                          <button title="Check out" disabled={isMarking} onClick={() => handleMark(b, "checkout")} style={{ ...iconBtn, color: "#4A4FA0" }}><LogOut size={15} /></button>
                         )}
                       </div>
                     </td>

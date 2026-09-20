@@ -109,6 +109,29 @@ export const getHotelById = async (req, res) => {
   }
 };
 
+// GET /api/hotels/sitemap.xml — dynamically generated so it stays current
+// with real hotels, without needing a static-site-generation framework.
+// CLIENT_URL is a comma-separated list (CORS origins); the first entry is
+// treated as the canonical public site to build hotel page URLs against.
+export const getSitemap = async (req, res) => {
+  try {
+    const siteUrl = (process.env.CLIENT_URL || "").split(",")[0]?.trim().replace(/\/$/, "") || "https://myspacehotels.in";
+    const { data: hotels, error } = await supabase.from("hotels").select("id, updated_at").eq("available", true);
+    if (error) throw error;
+
+    const staticPaths = ["/", "/hotels"];
+    const urls = [
+      ...staticPaths.map(p => `<url><loc>${siteUrl}${p}</loc></url>`),
+      ...hotels.map(h => `<url><loc>${siteUrl}/hotels/${h.id}</loc>${h.updated_at ? `<lastmod>${new Date(h.updated_at).toISOString().slice(0, 10)}</lastmod>` : ""}</url>`),
+    ];
+
+    const xml = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.join("\n")}\n</urlset>`;
+    res.set("Content-Type", "application/xml").send(xml);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 // GET /api/hotels/featured/list
 export const getFeaturedHotels = async (req, res) => {
   try {

@@ -4,6 +4,7 @@ import { useHotelPortal } from "../../context/HotelPortalContext.jsx";
 import { adminApi } from "../../lib/api.js";
 import { theme } from "../../lib/theme.js";
 import { Save, ToggleLeft, ToggleRight, Coffee, Clock } from "lucide-react";
+import LocationPicker from "../../shared/components/LocationPicker.jsx";
 
 const TAGS = ["Heritage", "Beachfront", "Luxury", "Boutique", "Mountain", "City"];
 const AMENITIES = ["WiFi", "Pool", "Spa", "Restaurant", "Bar", "Parking", "Gym", "Beach Access", "Room Service", "Laundry", "Airport Transfer", "Pet Friendly", "Fireplace", "Garden", "Rooftop", "Yoga Deck", "Bicycles", "Library", "Trekking", "Boat Tours"];
@@ -30,6 +31,8 @@ export default function PropertyManager() {
         bathrooms: myHotel.bathrooms || 1,
         max_guests: myHotel.max_guests || 4,
         house_rules: myHotel.house_rules || "",
+        latitude: myHotel.latitude ?? null,
+        longitude: myHotel.longitude ?? null,
       });
     }
   }, [myHotel]);
@@ -66,6 +69,8 @@ export default function PropertyManager() {
         bathrooms: Number(form.bathrooms) || 1,
         max_guests: Number(form.max_guests) || 1,
         house_rules: form.house_rules || null,
+        latitude: form.latitude ?? null,
+        longitude: form.longitude ?? null,
       });
       await refreshHotel();
       setSaved(true);
@@ -158,6 +163,15 @@ export default function PropertyManager() {
                 <div>
                   <label style={lbl}>House Rules (optional)</label>
                   <textarea style={{ ...inp, minHeight: 90, resize: "vertical" }} placeholder="e.g. No smoking indoors, quiet hours after 10pm" value={form.house_rules} onChange={e => setForm({ ...form, house_rules: e.target.value })} />
+                </div>
+                <div>
+                  <label style={lbl}>Location on Map</label>
+                  <LocationPicker
+                    latitude={form.latitude}
+                    longitude={form.longitude}
+                    onChange={(lat, lng) => setForm(f => ({ ...f, latitude: lat, longitude: lng }))}
+                    addressHint={[form.city, form.state].filter(Boolean).join(", ")}
+                  />
                 </div>
               </div>
             </div>

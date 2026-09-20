@@ -3,6 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { theme } from "../lib/theme.js";
 import { api } from "../lib/api.js";
 import HotelCard from "../components/HotelCard.jsx";
+import { useDocumentMeta } from "../lib/useDocumentMeta.js";
 
 export default function Hotels() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -15,6 +16,13 @@ export default function Hotels() {
   const checkIn = searchParams.get("check_in") || "";
   const checkOut = searchParams.get("check_out") || "";
   const guests = searchParams.get("guests") || "";
+
+  useDocumentMeta({
+    title: city ? `Stays in ${city} | My Space Hotels` : "All Stays | My Space Hotels",
+    description: city
+      ? `Browse curated hotels and stays in ${city} on My Space Hotels.`
+      : "Browse our full curated collection of independent hotels and stays across India.",
+  });
 
   useEffect(() => {
     setLoading(true);

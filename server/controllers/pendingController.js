@@ -1,5 +1,6 @@
 import { supabase } from "../config/supabase.js";
 import { audit } from "../audit.js";
+import { isValidPhone } from "../utils/validation.js";
 
 // Submit a new hotel for review. owner_id/owner_email come from the
 // verified session, not the request body — otherwise anyone could submit
@@ -9,6 +10,9 @@ import { audit } from "../audit.js";
 export const submitHotel = async (req, res) => {
   try {
     const { owner_id, owner_email, ...rest } = req.body;
+    if (rest.contact_number && !isValidPhone(rest.contact_number)) {
+      return res.status(400).json({ message: "Contact number doesn't look valid — use 10-15 digits, optionally with a country code." });
+    }
     const payload = { ...rest, owner_id: req.user.id, owner_email: req.user.email };
     const { data, error } = await supabase
       .from("pending_hotels")

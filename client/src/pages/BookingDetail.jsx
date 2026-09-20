@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { guestBookingApi, reviewApi } from "../lib/api.js";
 import { theme } from "../lib/theme.js";
 import { ArrowLeft, MapPin, Clock, Phone, Calendar, Users, IndianRupee, Star, X, CheckCircle2, Ban } from "lucide-react";
+import MapPreview from "../shared/components/MapPreview.jsx";
 
 export default function BookingDetail() {
   const { id } = useParams();
@@ -65,6 +66,14 @@ export default function BookingDetail() {
         <Detail icon={IndianRupee} label="Total Paid" value={`₹${Number(booking.total_price).toLocaleString("en-IN")}`} />
       </div>
 
+      {booking.checkin_token && (booking.checkin_status || "not_arrived") === "not_arrived" && booking.status !== "cancelled" && (
+        <div style={{ background: theme.SEA_DARK, color: theme.CREAM, padding: 20, marginBottom: 28, textAlign: "center" }}>
+          <div style={{ fontSize: 11, letterSpacing: "0.2em", textTransform: "uppercase", opacity: 0.8, marginBottom: 8 }}>Check-in Code</div>
+          <div className="serif" style={{ fontSize: 36, letterSpacing: "0.2em" }}>{booking.checkin_token}</div>
+          <div style={{ fontSize: 12, opacity: 0.8, marginTop: 8 }}>Show this code at the front desk when you arrive.</div>
+        </div>
+      )}
+
       {booking.special_request && (
         <div style={{ background: theme.SAND, padding: 16, marginBottom: 28, fontSize: 14 }}>
           <strong>Special request:</strong> {booking.special_request}
@@ -78,6 +87,11 @@ export default function BookingDetail() {
         {h.contact_number && <InfoRow icon={Phone} text={h.contact_number} />}
         {(h.checkin_time || h.checkout_time) && <InfoRow icon={Clock} text={`Check-in ${h.checkin_time || "—"} · Check-out ${h.checkout_time || "—"}`} />}
         {h.google_map_link && <a href={h.google_map_link} target="_blank" rel="noreferrer" style={{ color: theme.SEA_DARK, fontSize: 14, display: "inline-flex", alignItems: "center", gap: 6, marginTop: 8 }}><MapPin size={14} /> View on Google Maps →</a>}
+        {h.latitude && h.longitude && (
+          <div style={{ marginTop: 16 }}>
+            <MapPreview latitude={h.latitude} longitude={h.longitude} interactive height={280} />
+          </div>
+        )}
       </div>
 
       {/* Existing review */}

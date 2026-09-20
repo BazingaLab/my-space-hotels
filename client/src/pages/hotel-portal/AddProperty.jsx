@@ -8,6 +8,7 @@ import { theme } from "../../lib/theme.js";
 import { Building2, Send, CheckCircle2, Upload, Image as ImageIcon, Coffee, Clock, ShieldCheck } from "lucide-react";
 import { supabase } from "../../lib/supabase.js";
 import AddressInput from "../../shared/components/AddressInput.jsx";
+import { isValidPhone } from "../../lib/validation.js";
 
 const TAGS = ["Heritage", "Beachfront", "Boutique", "Hotel", "Resort", "BnB"];
 // Same amenity list used on ListProperty.jsx / PropertyManager.jsx — kept
@@ -71,6 +72,10 @@ export default function AddProperty() {
   const submit = async () => {
     setError(null);
     if (!form.name || !form.city) { setError("Property name and city are required."); return; }
+    if (form.contact_number && !isValidPhone(form.contact_number)) {
+      setError("Contact number doesn't look valid — use 10-15 digits, optionally with a country code.");
+      return;
+    }
     setSubmitting(true);
     try {
       await pendingApi.submit({

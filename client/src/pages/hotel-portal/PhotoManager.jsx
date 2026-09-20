@@ -106,6 +106,17 @@ export default function PhotoManager() {
         await supabase.storage.from("hotel-photos").remove([urlParts[1]]);
       }
       await supabase.from("hotel_photos").delete().eq("id", photo.id);
+
+      // If the deleted photo was the hotel's cover image, hotels.cover_image
+      // would otherwise keep pointing at a now-deleted Storage file — a
+      // stale/broken image on every listing that reads it. Reassign to
+      // another remaining cover-category photo if one exists, else clear it.
+      if (myHotel?.cover_image === photo.url) {
+        const remainingCoverPhotos = photos.filter(p => p.category === "cover" && p.id !== photo.id);
+        const newCover = remainingCoverPhotos[0]?.url || null;
+        await supabase.from("hotels").update({ cover_image: newCover }).eq("id", myHotel.id);
+      }
+
       await loadPhotos();
     } catch (err) {
       setError(`Delete failed: ${err.message}`);

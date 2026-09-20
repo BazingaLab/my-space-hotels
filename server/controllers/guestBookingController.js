@@ -22,7 +22,7 @@ export const detail = async (req, res) => {
     const { id } = req.params;
     const { data: booking, error } = await supabase
       .from("bookings")
-      .select("*, hotels!hotel_id(name, city, property_address, google_map_link, checkin_time, checkout_time, amenities, cover_image, free_cancellation_hours, contact_number)")
+      .select("*, hotels!hotel_id(name, city, property_address, google_map_link, latitude, longitude, checkin_time, checkout_time, amenities, cover_image, free_cancellation_hours, contact_number)")
       .eq("id", id).single();
     if (error || !booking) return res.status(404).json({ message: "Booking not found" });
 

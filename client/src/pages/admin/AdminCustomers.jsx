@@ -6,7 +6,20 @@ import StatusBadge from "../../shared/components/StatusBadge.jsx";
 import KPICard from "../../shared/components/KPICard.jsx";
 import { useCustomers, useCustomerStats } from "../../features/customers/hooks.jsx";
 import { theme } from "../../lib/theme.js";
-import { Users, Crown, Star, IndianRupee, Eye, Gift } from "lucide-react";
+import { exportToCsv } from "../../lib/csvExport.js";
+import { Users, Crown, Star, IndianRupee, Eye, Gift, Download } from "lucide-react";
+
+const CUSTOMER_CSV_COLUMNS = [
+  { key: "id", label: "Customer ID" },
+  { key: "name", label: "Name" },
+  { key: "email", label: "Email" },
+  { key: "phone", label: "Phone" },
+  { key: "classification", label: "Tier" },
+  { key: "total_bookings", label: "Total Bookings" },
+  { key: "total_spent", label: "Total Spent" },
+  { key: "loyalty_points", label: "Loyalty Points" },
+  { key: "created_at", label: "Created At" },
+];
 
 const CLASS_STYLE = {
   Premium: { bg: "#FFF4E0", color: "#B8860B" },
@@ -79,16 +92,25 @@ export default function AdminCustomers() {
         <KPICard label="Points Issued" value={Number(stats?.totalPoints || 0).toLocaleString("en-IN")} icon={Star} color="#E87C4E" />
       </div>
 
-      <div style={{ display: "flex", gap: 8, marginBottom: 24 }}>
-        {tabs.map(t => {
-          const active = (filter.classification || "") === t.key;
-          return (
-            <button key={t.key || "all"} onClick={() => setFilter(t.key ? { classification: t.key } : {})}
-              style={{ padding: "8px 18px", border: `1px solid ${active ? theme.INK : theme.SAND}`, background: active ? theme.INK : "transparent", color: active ? theme.CREAM : theme.INK, fontSize: 12, letterSpacing: "0.1em", textTransform: "uppercase", cursor: "pointer" }}>
-              {t.label}
-            </button>
-          );
-        })}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24, flexWrap: "wrap", gap: 12 }}>
+        <div style={{ display: "flex", gap: 8 }}>
+          {tabs.map(t => {
+            const active = (filter.classification || "") === t.key;
+            return (
+              <button key={t.key || "all"} onClick={() => setFilter(t.key ? { classification: t.key } : {})}
+                style={{ padding: "8px 18px", border: `1px solid ${active ? theme.INK : theme.SAND}`, background: active ? theme.INK : "transparent", color: active ? theme.CREAM : theme.INK, fontSize: 12, letterSpacing: "0.1em", textTransform: "uppercase", cursor: "pointer" }}>
+                {t.label}
+              </button>
+            );
+          })}
+        </div>
+        <button onClick={() => exportToCsv("customers", customers, CUSTOMER_CSV_COLUMNS)} disabled={!customers.length} style={{
+          display: "flex", alignItems: "center", gap: 8, background: "transparent", border: `1px solid ${theme.SAND}`,
+          padding: "8px 16px", fontSize: 12, letterSpacing: "0.1em", textTransform: "uppercase",
+          cursor: customers.length ? "pointer" : "not-allowed", color: theme.INK, opacity: customers.length ? 1 : 0.5,
+        }}>
+          <Download size={14} /> Export CSV
+        </button>
       </div>
 
       <DataTable data={customers} columns={columns} searchPlaceholder="Search name, email, phone..." isLoading={isLoading} emptyMessage="No customers yet" pageSize={15} />
