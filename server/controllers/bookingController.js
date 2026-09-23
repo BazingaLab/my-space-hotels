@@ -68,6 +68,15 @@ export const createBooking = async (req, res) => {
 // reviewed. Empty array = not reviewed yet.
 export const getBookingsByEmail = async (req, res) => {
   try {
+    if (
+      req.user.role !== "super_admin" &&
+      req.params.email.toLowerCase() !== (req.user.email || "").toLowerCase()
+    ) {
+      return res.status(403).json({
+        message: "You can only look up your own bookings"
+      });
+    }
+
     const { data, error } = await supabase
       .from("bookings")
       .select("*, hotels!hotel_id(name, city, cover_image), reviews(id, rating)")
@@ -88,6 +97,12 @@ export const getBookingsByEmail = async (req, res) => {
 export const getBookingsByUser = async (req, res) => {
   try {
     const { userId } = req.params;
+
+    if (req.user.role !== "super_admin" && req.user.id !== userId) {
+      return res.status(403).json({
+        message: "You can only look up your own bookings"
+      });
+    }
 
     // Step 1: get the account email (service role can access auth.admin)
     const { data: { user }, error: authErr } = await supabase.auth.admin.getUserById(userId);
